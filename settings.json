@@ -1,9 +1,15 @@
 {
-    "inputDevice": "Microphone (AB13X USB Audio)",
-    "outputDevice": "Speakers (AB13X USB Audio)",
-    "micVolume": "17",
-    "speakerVolume": "66",
+    "inputDevice": "Microphone Array (2- Realtek(R) Audio)",
+    "outputDevice": "System default",
+    "micVolume": "50",
+    "speakerVolume": "69",
     "activationMode": "Push to Talk",
+    "hardwareInterface": {
+        "enableHardwarePTT": false,
+        "serialPort": "",
+        "pttPin": "RTS",
+        "baudRate": "9600"
+    },
     "shortcuts": {
         "pushToTalk": "SPACE",
         "toggleMute": "Ctrl+A",
@@ -13,11 +19,5 @@
         "sound": true,
         "native": true,
         "welcomeMessage": "Always"
-    },
-    "hardwareInterface": {
-        "enableHardwarePTT": false,
-        "serialPort": "",
-        "pttPin": "RTS",
-        "baudRate": "9600"
     }
 }

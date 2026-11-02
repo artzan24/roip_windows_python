@@ -1042,8 +1042,18 @@
             }
 
             function updateSliderLabel(sliderId, textId, unit) {
-                const val = document.getElementById(sliderId).value;
-                document.getElementById(textId).innerText = val + unit;
+                const slider = document.getElementById(sliderId);
+                const text = document.getElementById(textId);
+                if (slider && text) {
+                    text.innerText = slider.value + unit;
+
+                    // Kirim perubahan nilai slider ke backend Python secara real-time
+                    if (window.pywebview) {
+                        const micVol = document.getElementById('micVolume').value;
+                        const speakerVol = document.getElementById('speakerVolume').value;
+                        window.pywebview.api.save_audio_volumes(micVol, speakerVol);
+                    }
+                }
             }
 
             let currentActivationMode = "Voice Activation";
