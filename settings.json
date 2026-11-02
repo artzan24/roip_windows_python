@@ -1,0 +1,23 @@
+{
+    "inputDevice": "Microphone (AB13X USB Audio)",
+    "outputDevice": "Speakers (AB13X USB Audio)",
+    "micVolume": "17",
+    "speakerVolume": "66",
+    "activationMode": "Push to Talk",
+    "shortcuts": {
+        "pushToTalk": "SPACE",
+        "toggleMute": "Ctrl+A",
+        "toggleDeafen": "Ctrl+J"
+    },
+    "notifications": {
+        "sound": true,
+        "native": true,
+        "welcomeMessage": "Always"
+    },
+    "hardwareInterface": {
+        "enableHardwarePTT": false,
+        "serialPort": "",
+        "pttPin": "RTS",
+        "baudRate": "9600"
+    }
+}

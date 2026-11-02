@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="id">
+
+    <head>
+        <meta charset="UTF-8">
+        <title>Fancy Mumble - Login</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <style>
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+                font-family: 'Inter', sans-serif;
+            }
+
+            body {
+                background-color: #0d0e12;
+                background-image:
+                    radial-gradient(circle at 50% 30%, rgba(56, 189, 248, 0.08) 0%, rgba(23, 24, 33, 0.4) 50%, #0d0e12 100%),
+                    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.025'/%3E%3C/svg%3E");
+                color: #f2f3f5;
+                width: 100vw;
+                height: 100vh;
+                overflow: hidden;
+            }
+
+            .window-container {
+                display: flex;
+                flex-direction: column;
+                width: 100vw;
+                height: 100vh;
+                position: relative;
+            }
+
+            /* Title Bar */
+            .title-bar {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px;
+                background: transparent;
+                -webkit-app-region: drag;
+                width: 100%;
+                z-index: 10;
+            }
+
+            .title-left {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                font-size: 13px;
+                color: #b5bac1;
+            }
+
+            .app-name {
+                color: #f2f3f5;
+                font-weight: 600;
+            }
+
+            .badge-friends {
+                background-color: #2b2d31;
+                padding: 4px 10px;
+                border-radius: 6px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .title-controls {
+                display: flex;
+                gap: 16px;
+                color: #b5bac1;
+                font-size: 14px;
+                cursor: pointer;
+                -webkit-app-region: no-drag;
+            }
+
+            .control-close:hover {
+                color: #da373c;
+            }
+
+            /* Login Card Wrapper */
+            .login-wrapper {
+                position: relative;
+                width: 100%;
+                flex: 1;
+            }
+
+            .login-card {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background-color: rgba(23, 24, 33, 0.85);
+                backdrop-filter: blur(16px);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 16px;
+                width: 400px;
+                padding: 30px 25px;
+                box-shadow: 0 16px 32px rgba(0, 0, 0, 0.6);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            /* Logo M */
+            .logo-box {
+                width: 54px;
+                height: 54px;
+                background: linear-gradient(135deg, #5865f2 0%, #7928ca 100%);
+                border-radius: 16px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                font-size: 26px;
+                font-weight: bold;
+                color: white;
+                box-shadow: 0 8px 20px rgba(121, 40, 202, 0.4);
+                margin-bottom: 12px;
+            }
+
+            .login-card h2 {
+                font-size: 20px;
+                font-weight: 700;
+                color: #f2f3f5;
+                margin-bottom: 4px;
+            }
+
+            .subtitle {
+                font-size: 12px;
+                color: #949ba4;
+                margin-bottom: 20px;
+            }
+
+            /* Form Input Group */
+            .form-section {
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                margin-bottom: 20px;
+            }
+
+            .input-group {
+                display: flex;
+                flex-direction: column;
+                text-align: left;
+            }
+
+            .input-group label {
+                font-size: 11px;
+                font-weight: 600;
+                color: #b5bac1;
+                margin-bottom: 6px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .input-group input {
+                background-color: rgba(30, 58, 138, 0.05);
+                border: 1px solid #383a40;
+                border-radius: 8px;
+                padding: 10px 12px;
+                color: #f2f3f5;
+                font-size: 13px;
+                outline: none;
+                transition: border-color 0.2s;
+                width: 100%;
+            }
+
+            .input-group input:focus {
+                border-color: rgba(51, 65, 85, 0.5);
+            }
+
+            .password-input-wrapper {
+                position: relative;
+                display: flex;
+                align-items: center;
+            }
+
+            .password-input-wrapper input {
+                padding-right: 38px;
+            }
+
+            .password-toggle-icon {
+                position: absolute;
+                right: 12px;
+                color: #94a3b8;
+                font-size: 14px;
+                cursor: pointer;
+                transition: color 0.2s;
+            }
+
+            .password-toggle-icon:hover {
+                color: #38bdf8;
+            }
+
+            /* Menghilangkan tombol show/hide password bawaan browser (Edge/Chrome/WebKit) */
+            input[type="password"]::-ms-reveal,
+            input[type="password"]::-ms-clear {
+                display: none;
+            }
+
+            input[type="password"]::-webkit-credentials-auto-fill-button,
+            input[type="password"]::-webkit-text-security-button {
+                visibility: hidden;
+                display: none !important;
+                pointer-events: none;
+                height: 0;
+                width: 0;
+                margin: 0;
+            }
+
+            /* Tombol Login Utama */
+            .btn-login {
+                width: 100%;
+                background-color: #5865f2;
+                color: white;
+                font-weight: 600;
+                padding: 12px;
+                border-radius: 8px;
+                border: none;
+                cursor: pointer;
+                font-size: 14px;
+                transition: background 0.2s;
+                margin-top: 5px;
+            }
+
+            .btn-login:hover {
+                background-color: #4752c4;
+            }
+
+            .btn-login:active {
+                background-color: #3c45a5;
+            }
+
+            /* Styling SweetAlert2 */
+            .swal2-container {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                z-index: 99999 !important;
+            }
+
+            /* Styling kustom untuk memperkecil seluruh elemen SweetAlert */
+            .swal2-popup {
+                font-size: 0.85rem !important;
+                width: 24rem !important;
+                padding: 1.25rem !important;
+                border-radius: 1rem !important;
+                background-color: #0f172a !important;
+                /* Warna putih untuk light mode */
+                color: #f1f5f9 !important;
+                border: 1px solid #1e293b !important;
+            }
+
+            /* Komponen Pendukung Lainnya */
+            .swal2-popup .swal2-icon {
+                transform: scale(0.75);
+                margin: 0.5rem auto 1rem auto !important;
+            }
+
+            .swal2-popup .swal2-title {
+                font-size: 1.1rem !important;
+                font-weight: 600 !important;
+                color: inherit !important;
+            }
+
+            .swal2-popup .swal2-html-container {
+                font-size: 0.8rem !important;
+                color: #94a3b8 !important;
+            }
+
+            .swal2-popup .swal2-styled {
+                font-size: 0.75rem !important;
+                padding: 0.5rem 1rem !important;
+                border-radius: 0.5rem !important;
+                box-shadow: none !important;
+            }
+
+            .swal2-popup .swal2-confirm {
+                background-color: #2563eb !important;
+            }
+
+            .swal2-popup .swal2-cancel {
+                background-color: #475569 !important;
+            }
+
+            /* Efek Blur pada Backdrop SweetAlert2 */
+            .swal2-container.swal2-backdrop-show,
+            .swal2-container.swal2-noanimation {
+                background: rgba(0, 0, 0, 0.4) !important;
+                /* Warna gelap transparan untuk tema terang/gelap */
+                backdrop-filter: blur(4px) !important;
+                /* Efek blur kaca */
+                -webkit-backdrop-filter: blur(4px) !important;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div class="window-container">
+            <!-- Top Title Bar -->
+            <div class="title-bar">
+                <div class="title-left">
+                    <i class="bi bi-info-circle"></i>
+                    <span class="app-name">ROIP TIK Polda Bali</span>
+                    <span class="badge-friends"><i class="bi bi-box-arrow-in-right"></i> Login Aplikasi</span>
+                </div>
+                <div class="title-controls">
+                    <span class="control-minimize" onclick="window.pywebview.api.minimize_window()" title="Minimize">
+                        <i class="bi bi-dash"></i>
+                    </span>
+                    <span class="control-maximize" onclick="window.pywebview.api.maximize_window()" title="Maximize">
+                        <i class="bi bi-arrows-angle-expand"></i>
+                    </span>
+                    <span class="control-close" onclick="window.pywebview.api.close_window()" title="Close">
+                        <i class="bi bi-x-lg"></i>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Main Login Card Area -->
+            <div class="login-wrapper">
+                <div class="login-card">
+                    <div class="logo-box">
+                        <span>M</span>
+                    </div>
+
+                    <h2>Fancy Mumble</h2>
+                    <p class="subtitle">Konfigurasi & Masuk ke Server Gateway</p>
+
+                    <div class="form-section">
+                        <div class="input-group">
+                            <label>IP Server</label>
+                            <input type="text" id="input_ip" placeholder="Contoh: 10.18.200.21">
+                        </div>
+                        <div class="input-group">
+                            <label>Port Server</label>
+                            <input type="text" id="input_port" placeholder="Contoh: 3002">
+                        </div>
+                        <div class="input-group">
+                            <label>Username</label>
+                            <input type="text" id="input_user" placeholder="Masukkan username...">
+                        </div>
+                        <div class="input-group">
+                            <label>Password</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="input_pass" placeholder="Masukkan password...">
+                                <i class="bi bi-eye password-toggle-icon" id="togglePassword" onclick="togglePasswordVisibility()" title="Tampilkan/Sembunyikan Password"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn-login" onclick="handleLogin()">LOGIN & HUBUNGKAN</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SweetAlert2 & Skrip Logika -->
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <script>
+            // Event saat pywebview siap dimuat
+            window.addEventListener('pywebviewready', function () {
+                // Terapkan state ukuran jendela jika tersedia
+                if (window.pywebview && window.pywebview.api.apply_window_state) {
+                    window.pywebview.api.apply_window_state();
+                }
+
+                // Muat konfigurasi tersimpan (IP, Port, Username) dari backend Python
+                if (window.pywebview && window.pywebview.api.load_config) {
+                    window.pywebview.api.load_config().then(config => {
+                        if (config) {
+                            if (config.ip_server) document.getElementById('input_ip').value = config.ip_server;
+                            if (config.port) document.getElementById('input_port').value = config.port;
+                            if (config.username) document.getElementById('input_user').value = config.username;
+                        }
+                    });
+                }
+            });
+
+            // Fungsi untuk Mengubah Tipe Input Password & Mengganti Ikon Mata
+            function togglePasswordVisibility() {
+                const passwordInput = document.getElementById('input_pass');
+                const toggleIcon = document.getElementById('togglePassword');
+
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    toggleIcon.classList.remove('bi-eye');
+                    toggleIcon.classList.add('bi-eye-slash');
+                } else {
+                    passwordInput.type = 'password';
+                    toggleIcon.classList.remove('bi-eye-slash');
+                    toggleIcon.classList.add('bi-eye');
+                }
+            }
+
+            // Fungsi untuk Menangani Proses Login
+            function handleLogin() {
+                const ip = document.getElementById('input_ip').value.trim();
+                const port = document.getElementById('input_port').value.trim();
+                const username = document.getElementById('input_user').value.trim();
+                const password = document.getElementById('input_pass').value.trim();
+
+                if (!ip || !port || !username || !password) {
+                    Swal.fire({
+                        title: 'Formulir Belum Lengkap',
+                        text: 'Harap isi semua kolom kredensial (IP Server, Port, Username, dan Password) terlebih dahulu.',
+                        icon: 'warning',
+                        confirmButtonText: 'Mengerti',
+                        confirmButtonColor: '#3b82f6'
+                    });
+                    return;
+                }
+
+                const loginBtn = document.querySelector('.btn-login');
+                loginBtn.disabled = true;
+                loginBtn.style.opacity = '0.7';
+                loginBtn.style.cursor = 'not-allowed';
+                const originalText = loginBtn.innerText;
+                loginBtn.innerHTML = '<i class="bi bi-arrow-repeat" style="animation: spin 1s linear infinite; display: inline-block; margin-right: 6px;"></i> MEMPROSES...';
+
+                // Memanggil fungsi login_action yang ada di api_controller.py
+                window.pywebview.api.login_action(ip, port, username, password).then(response => {
+                    loginBtn.disabled = false;
+                    loginBtn.style.opacity = '1';
+                    loginBtn.style.cursor = 'pointer';
+                    loginBtn.innerText = originalText;
+
+                    if (!response.success) {
+                        Swal.fire({
+                            title: 'Autentikasi Gagal',
+                            text: response.message || 'Periksa kembali kredensial Anda.',
+                            icon: 'error',
+                            confirmButtonText: 'Coba Lagi',
+                            confirmButtonColor: '#ef4444'
+                        });
+                    } else {
+                        localStorage.setItem('user_id', response.user_id);
+                        Swal.fire({
+                            title: 'Login Berhasil',
+                            text: 'Memuat sesi Dispatcher Console...',
+                            icon: 'success',
+                            timer: 1500,
+                            timerProgressBar: true,
+                            showConfirmButton: false
+                        }).then(() => {
+                            window.location.href = 'index.html';
+                        });
+                    }
+                }).catch(error => {
+                    loginBtn.disabled = false;
+                    loginBtn.style.opacity = '1';
+                    loginBtn.style.cursor = 'pointer';
+                    loginBtn.innerText = originalText;
+
+                    Swal.fire({
+                        title: 'Kesalahan Sistem',
+                        text: 'Terjadi kesalahan saat menghubungkan ke backend: ' + error,
+                        icon: 'error',
+                        confirmButtonColor: '#ef4444'
+                    });
+                });
+            }
+        </script>
+    </body>
+
+</html>

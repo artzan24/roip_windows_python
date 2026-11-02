@@ -1,0 +1,1936 @@
+<!DOCTYPE html>
+<html lang="id">
+
+    <head>
+        <meta charset="UTF-8">
+        <title>Fancy Mumble - Dispatcher Console</title>
+        <!-- Bootstrap Icons -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+        <style>
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+                font-family: 'Inter', sans-serif;
+            }
+
+            :root {
+                --bg-primary: #182232;
+                --bg-secondary: rgba(24, 34, 50, 0.85);
+                --bg-tertiary: #111722;
+                --text-normal: #e2e8f0;
+                --text-muted: #94a3b8;
+                --accent-green: #22c55e;
+                --accent-red: #ef4444;
+                --accent-orange: #f59e0b;
+                --hover-bg: rgba(51, 65, 85, 0.5);
+                --active-bg: rgba(30, 58, 138, 0.4);
+                --border-color: rgba(51, 65, 85, 0.3);
+                --bubble-incoming: #1e293b;
+                --bubble-outgoing: #047857;
+            }
+
+            html,
+            body {
+                background-color: transparent !important;
+                color: var(--text-normal);
+                width: 100vw;
+                height: 100vh;
+                overflow: hidden;
+                user-select: none;
+            }
+
+            ::-webkit-scrollbar {
+                width: 4px;
+                height: 4px;
+            }
+
+            ::-webkit-scrollbar-track {
+                background: transparent;
+            }
+
+            ::-webkit-scrollbar-thumb {
+                background: rgba(156, 163, 175, 0.2);
+                border-radius: 2px;
+            }
+
+            .fs-12 {
+                font-size: 1.25rem !important;
+            }
+
+            .window-container {
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
+                width: 100vw;
+                overflow: hidden;
+            }
+
+            /* Title Bar Custom */
+            .title-bar {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 15px;
+                background-color: var(--bg-tertiary);
+                border-bottom: 1px solid var(--border-color);
+                z-index: 1000;
+                flex-shrink: 0;
+                user-select: none;
+
+                /* KUNCI UTAMA DARI PYWEBVIEW */
+                -webkit-app-region: drag;
+            }
+
+            /* 2. Pastikan tombol kontrol, badge status, dan elemen interaktif di dalam title-bar TIDAK BISA di-drag */
+            .title-controls,
+            .title-controls *,
+            .connection-badge,
+            .connection-badge * {
+                -webkit-app-region: no-drag;
+            }
+
+            /* Hapus atau biarkan tanpa app-region */
+            .title-left {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                font-size: 13px;
+                color: var(--text-muted);
+            }
+
+            .app-name {
+                color: var(--text-normal);
+                font-weight: 600;
+            }
+
+            .badge-friends {
+                background-color: #2b2d31;
+                padding: 4px 10px;
+                border-radius: 6px;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                font-size: 11px;
+                color: #22c55e;
+            }
+
+            .title-controls {
+                display: flex;
+                gap: 16px;
+                color: var(--text-muted);
+                font-size: 14px;
+                cursor: pointer;
+                -webkit-app-region: no-drag;
+            }
+
+            .title-controls span:hover {
+                color: var(--text-normal);
+            }
+
+            .control-close:hover {
+                color: var(--accent-red) !important;
+            }
+
+            /* Layout Utama Aplikasi */
+            .app-layout {
+                display: flex;
+                flex: 1;
+                width: 100%;
+                height: calc(100vh - 45px);
+                overflow: hidden;
+                background-color: var(--bg-primary);
+            }
+
+            /* Sidebar Kiri Mumble */
+            .sidebar {
+                width: 310px;
+                min-width: 310px;
+                background-color: var(--bg-secondary);
+                backdrop-filter: blur(10px);
+                border-right: 1px solid var(--border-color);
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                height: 100%;
+                -webkit-app-region: no-drag;
+            }
+
+            .sidebar-top-section {
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                overflow: hidden;
+            }
+
+            .search-container {
+                padding: 12px;
+                border-bottom: 1px solid var(--border-color);
+                flex-shrink: 0;
+            }
+
+            .search-box {
+                width: 100%;
+                background-color: rgba(15, 23, 42, 0.6);
+                border: 1px solid var(--border-color);
+                border-radius: 10px;
+                padding: 10px 12px;
+                color: var(--text-normal);
+                font-size: 13px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .search-box input {
+                background: transparent;
+                border: none;
+                color: var(--text-normal);
+                font-size: 13px;
+                outline: none;
+                width: 100%;
+            }
+
+            .search-shortcut {
+                font-size: 10px;
+                background-color: rgba(51, 65, 85, 0.6);
+                color: var(--text-muted);
+                padding: 2px 5px;
+                border-radius: 4px;
+            }
+
+            .sidebar-tabs {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 8px 16px;
+                border-bottom: 1px solid var(--border-color);
+                flex-shrink: 0;
+            }
+
+            .tab-btn {
+                background: transparent;
+                border: none;
+                color: var(--text-muted);
+                padding: 6px 0;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: 0.2s;
+                position: relative;
+                flex: 1;
+                text-align: center;
+            }
+
+            .tab-btn:hover,
+            .tab-btn.active {
+                color: var(--text-normal);
+            }
+
+            .tab-btn.active::after {
+                content: '';
+                position: absolute;
+                bottom: -8px;
+                left: 0;
+                width: 100%;
+                height: 2px;
+                background-color: #38bdf8;
+            }
+
+            .tab-content-area {
+                flex: 1;
+                overflow-y: auto;
+                padding: 8px;
+            }
+
+            .tab-pane {
+                display: none;
+            }
+
+            .tab-pane.active {
+                display: block;
+            }
+
+            .list-category {
+                font-size: 11px;
+                font-weight: 700;
+                color: var(--text-muted);
+                letter-spacing: 0.5px;
+                padding: 8px 8px 15px 8px;
+                text-transform: uppercase;
+            }
+
+            .channel-row {
+                padding: 8px 10px;
+                border-radius: 10px;
+                color: var(--text-normal);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                font-size: 12px;
+                font-weight: 500;
+                transition: 0.15s;
+                margin-bottom: 2px;
+                background-color: transparent;
+                border: 1px solid transparent;
+            }
+
+            .channel-row:hover {
+                background-color: var(--hover-bg);
+            }
+
+            .channel-row.active {
+                background-color: var(--active-bg);
+                border-color: rgba(56, 189, 248, 0.2);
+            }
+
+            .channel-name-left {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .channel-mini-actions {
+                display: flex;
+                gap: 4px;
+            }
+
+            .btn-mini-ctrl {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                border: none;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                cursor: pointer;
+                transition: 0.2s;
+                background-color: rgba(51, 65, 85, 0.6);
+                color: var(--text-muted);
+            }
+
+            .btn-mini-ctrl.mic-active {
+                background-color: var(--accent-orange);
+                color: white;
+            }
+
+            .btn-mini-ctrl.speaker-muted {
+                background-color: var(--accent-red);
+                color: white;
+            }
+
+            .btn-mini-ctrl.speaker-active {
+                background-color: #2563eb;
+                color: white;
+            }
+
+            /* Footer Bawah Sidebar */
+            .sidebar-footer {
+                background-color: var(--bg-tertiary);
+                padding: 10px;
+                border-top: 1px solid var(--border-color);
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                flex-shrink: 0;
+            }
+
+            .user-panel-top {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .user-profile-box {
+                flex: 1;
+                background-color: rgba(15, 23, 42, 0.5);
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                padding: 6px 8px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .user-avatar {
+                width: 34px;
+                height: 34px;
+                min-width: 34px;
+                min-height: 34px;
+                flex-shrink: 0;
+                background-color: #7c3aed;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                color: white;
+                font-size: 13px;
+                position: relative;
+            }
+
+            .user-avatar-dot {
+                position: absolute;
+                bottom: -1px;
+                right: -1px;
+                width: 9px;
+                height: 9px;
+                background-color: var(--accent-green);
+                border-radius: 50%;
+                border: 2px solid var(--bg-secondary);
+            }
+
+            .user-badge-guest {
+                background-color: rgba(56, 189, 248, 0.15);
+                color: #38bdf8;
+                font-size: 10px;
+                font-weight: 700;
+                padding: 3px 6px;
+                border-radius: 4px;
+                letter-spacing: 0.5px;
+                margin-left: auto;
+                max-width: 120px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .audio-ctrl-btn {
+                width: 36px;
+                height: 36px;
+                border-radius: 8px;
+                border: 1px solid var(--border-color);
+                background-color: rgba(15, 23, 42, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: 0.2s;
+                font-size: 15px;
+                flex-shrink: 0;
+            }
+
+            .audio-ctrl-btn.mic-muted {
+                color: var(--accent-red);
+                border-color: rgba(239, 68, 68, 0.4);
+                background-color: rgba(239, 68, 68, 0.1);
+            }
+
+            .audio-ctrl-btn.mic-active {
+                color: var(--accent-green);
+                border-color: rgba(34, 197, 94, 0.4);
+                background-color: rgba(34, 197, 94, 0.1);
+            }
+
+            .audio-ctrl-btn.speaker-active {
+                color: var(--accent-green);
+                border-color: rgba(34, 197, 94, 0.4);
+                background-color: rgba(34, 197, 94, 0.1);
+            }
+
+            .audio-ctrl-btn:hover {
+                background-color: var(--hover-bg);
+            }
+
+            .user-panel-bottom {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .btn-footer-icon {
+                width: 36px;
+                height: 36px;
+                border-radius: 8px;
+                border: 1px solid var(--border-color);
+                background-color: rgba(15, 23, 42, 0.5);
+                color: var(--text-muted);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: 0.2s;
+                font-size: 15px;
+                flex-shrink: 0;
+            }
+
+            .btn-footer-icon:hover {
+                background-color: var(--hover-bg);
+                color: var(--text-normal);
+            }
+
+            .btn-disconnect {
+                flex: 1;
+                background-color: rgba(239, 68, 68, 0.75);
+                color: white;
+                font-weight: 600;
+                height: 36px;
+                border-radius: 8px;
+                border: 1px solid rgba(239, 68, 68, 1);
+                font-size: 13px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                transition: 0.2s;
+            }
+
+            .btn-disconnect:hover {
+                background-color: rgba(220, 38, 38, 1);
+            }
+
+            /* Area Kanan Utama */
+            .main-content {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                background-color: #111827;
+                height: 100%;
+                overflow: hidden;
+                -webkit-app-region: no-drag;
+            }
+
+            .content-body-split {
+                display: flex;
+                flex: 1;
+                overflow: hidden;
+            }
+
+            .chat-column {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                overflow: hidden;
+            }
+
+            .channel-top-header {
+                height: 48px;
+                padding: 0 16px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                border-bottom: 1px solid var(--border-color);
+                font-weight: 600;
+                font-size: 14px;
+                background-color: var(--bg-primary);
+            }
+
+            .channel-title-left {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            /* Ruang Obrolan WhatsApp Style */
+            .whatsapp-chat-container {
+                flex: 1;
+                padding: 16px 24px;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                background-color: #090d16;
+                background-image:
+                    linear-gradient(135deg, #090d16 0%, #0f172a 45%, #1e293b 100%),
+                    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.025'/%3E%3C/svg%3E");
+            }
+
+            .chat-bubble {
+                max-width: 65%;
+                padding: 10px 14px;
+                border-radius: 8px;
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+            }
+
+            .chat-bubble.incoming {
+                align-self: flex-start;
+                background-color: var(--bubble-incoming);
+                border-top-left-radius: 2px;
+            }
+
+            .chat-bubble.outgoing {
+                align-self: flex-end;
+                background-color: var(--bubble-outgoing);
+                border-top-right-radius: 2px;
+            }
+
+            .bubble-sender {
+                font-size: 11px;
+                font-weight: 700;
+                color: #38bdf8;
+            }
+
+            .bubble-text {
+                font-size: 13px;
+                color: #e2e8f0;
+                line-height: 1.4;
+                word-break: break-word;
+            }
+
+            .bubble-time {
+                font-size: 9px;
+                color: #94a3b8;
+                align-self: flex-end;
+                margin-top: 2px;
+            }
+
+            /* Panel Input Chat */
+            .chat-input-panel {
+                background-color: var(--bg-primary);
+                border-top: 1px solid var(--border-color);
+                padding: 12px 16px;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+
+            .chat-input-box {
+                flex: 1;
+                background-color: rgba(30, 41, 59, 0.8);
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                padding: 10px 14px;
+                color: var(--text-normal);
+                font-size: 13px;
+                outline: none;
+            }
+
+            .chat-input-box::placeholder {
+                color: var(--text-muted);
+            }
+
+            .btn-send {
+                background-color: #2563eb;
+                border: none;
+                color: white;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: 0.2s;
+                font-size: 16px;
+            }
+
+            .btn-send:hover {
+                background-color: #1d4ed8;
+            }
+
+            /* SIDEBAR KANAN PTT */
+            .ptt-sidebar {
+                width: 240px;
+                min-width: 240px;
+                background-color: rgba(17, 24, 39, 0.95);
+                border-left: 1px solid var(--border-color);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 20px 16px;
+                justify-content: space-between;
+                text-align: center;
+            }
+
+            .ptt-sidebar-content {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                width: 100%;
+                gap: 16px;
+            }
+
+            .ptt-title {
+                font-size: 13px;
+                font-weight: 700;
+                color: var(--text-normal);
+                letter-spacing: 0.5px;
+                text-transform: uppercase;
+            }
+
+            .ptt-instruction {
+                font-size: 11px;
+                color: var(--text-muted);
+                line-height: 1.4;
+            }
+
+            .ptt-channel-badge {
+                background-color: rgba(34, 197, 94, 0.15);
+                color: var(--accent-green);
+                border: 1px solid rgba(34, 197, 94, 0.3);
+                padding: 6px 12px;
+                border-radius: 20px;
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+                width: 100%;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            /* Tombol PTT Bulat Besar */
+            .ptt-round-btn {
+                width: 105px;
+                height: 105px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+                border: 4px solid rgba(34, 197, 94, 0.3);
+                color: white;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                box-shadow: 0 4px 20px rgba(22, 163, 74, 0.4);
+                transition: all 0.2s ease;
+                margin: 10px 0;
+                outline: none;
+            }
+
+            .ptt-round-btn:hover {
+                background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+                transform: scale(1.03);
+            }
+
+            .ptt-round-btn.active,
+            .ptt-round-btn:active {
+                background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+                border-color: rgba(220, 38, 38, 0.4);
+                box-shadow: 0 4px 20px rgba(220, 38, 38, 0.5);
+                transform: scale(0.97);
+            }
+
+            .ptt-round-btn i {
+                font-size: 30px;
+                margin-bottom: 2px;
+            }
+
+            .ptt-round-btn span {
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+            }
+
+            .ptt-activity-box {
+                background-color: rgba(30, 41, 59, 0.6);
+                border: 1px solid var(--border-color);
+                border-radius: 8px;
+                padding: 10px;
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+
+            .ptt-activity-label {
+                font-size: 10px;
+                color: var(--text-muted);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .ptt-activity-name {
+                font-size: 12px;
+                font-weight: 600;
+                color: var(--accent-orange);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            /* Status Badge Default / Online */
+            .connection-badge.online #status-dot {
+                background-color: #2ecc71;
+                box-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
+            }
+
+            .connection-badge.online #status-text {
+                color: #2ecc71;
+            }
+
+            /* Status Badge Kembali Online (Restored / Warning) */
+            .connection-badge.restored #status-dot {
+                background-color: #f1c40f;
+                box-shadow: 0 0 8px rgba(241, 196, 15, 0.6);
+            }
+
+            .connection-badge.restored #status-text {
+                color: #f1c40f;
+            }
+
+            /* Status Badge Offline */
+            .connection-badge.offline #status-dot {
+                background-color: #e74c3c;
+                box-shadow: 0 0 8px rgba(231, 76, 60, 0.6);
+            }
+
+            .connection-badge.offline #status-text {
+                color: #e74c3c;
+            }
+
+            /* Styling SweetAlert2 */
+            .swal2-popup {
+                font-size: 0.85rem !important;
+                width: 24rem !important;
+                padding: 1.25rem !important;
+                border-radius: 1rem !important;
+                background-color: #0f172a !important;
+                color: #f1f5f9 !important;
+                border: 1px solid #1e293b !important;
+            }
+
+            .swal2-popup .swal2-icon {
+                transform: scale(0.75);
+                margin: 0.5rem auto 1rem auto !important;
+            }
+
+            .swal2-popup .swal2-title {
+                font-size: 1.1rem !important;
+                font-weight: 600 !important;
+                color: inherit !important;
+            }
+
+            .swal2-popup .swal2-html-container {
+                font-size: 0.8rem !important;
+                color: #94a3b8 !important;
+            }
+
+            .swal2-popup .swal2-styled {
+                font-size: 0.75rem !important;
+                padding: 0.5rem 1rem !important;
+                border-radius: 0.5rem !important;
+            }
+
+            .swal2-popup .swal2-confirm {
+                background-color: #2563eb !important;
+            }
+
+            .swal2-popup .swal2-cancel {
+                background-color: #475569 !important;
+            }
+
+            .swal2-container.swal2-backdrop-show {
+                background: rgba(0, 0, 0, 0.4) !important;
+                backdrop-filter: blur(4px) !important;
+                -webkit-backdrop-filter: blur(4px) !important;
+            }
+
+            /* Styling untuk List Member Online */
+            .member-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 8px 10px;
+                border-radius: 8px;
+                cursor: default;
+                transition: 0.15s;
+                margin-bottom: 2px;
+            }
+
+            .member-row:hover {
+                background-color: var(--hover-bg);
+            }
+
+            .member-left {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                overflow: hidden;
+            }
+
+            .member-avatar {
+                width: 24px;
+                height: 24px;
+                min-width: 24px;
+                min-height: 24px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                color: white;
+                font-size: 11px;
+                position: relative;
+                background-color: #3b82f6;
+                /* Warna default, bisa dinamis */
+            }
+
+            .member-avatar-dot {
+                position: absolute;
+                bottom: -1px;
+                right: -1px;
+                width: 9px;
+                height: 9px;
+                background-color: var(--accent-green);
+                border-radius: 50%;
+                border: 2px solid var(--bg-secondary);
+            }
+
+            .member-info {
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            .member-username {
+                font-size: 11px;
+                font-weight: 600;
+                color: var(--text-normal);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .member-badge-room {
+                background-color: rgba(56, 189, 248, 0.15);
+                color: #38bdf8;
+                border: 1px solid rgba(56, 189, 248, 0.3);
+                font-size: 9px;
+                font-weight: 700;
+                padding: 3px 8px;
+                border-radius: 12px;
+                letter-spacing: 0.5px;
+                max-width: 130px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                text-align: center;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div class="window-container">
+            <!-- Title Bar Custom -->
+            <div class="title-bar pywebview-drag-region">
+                <div class="title-left" style="display: flex; align-items: center; gap: 12px;">
+                    <span class="app-name"><i class="bi bi-info-circle" style="padding-right: 5px;"></i> ROIP TIK Polda Bali</span>
+                    <span class="badge-friends" id="loggedInUserName">
+                        <i class="bi bi-check-circle" style="color: #22c55e; margin-right: 4px;"></i> Memuat Sesi...
+                    </span>
+                </div>
+                <div class="title-controls">
+                    <!-- Indikator Status Koneksi -->
+                    <div id="connection-status-badge" class="connection-badge online"
+                        style="display: flex; align-items: center; margin-right: 15px; font-size: 12px; font-weight: 500;">
+                        <span id="status-dot" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px;"></span>
+                        <span id="status-text">Online</span>
+                    </div>
+
+                    <span class="control-minimize" onclick="window.pywebview.api.minimize_window()" title="Minimize">
+                        <i class="bi bi-dash"></i>
+                    </span>
+                    <span class="control-maximize" onclick="window.pywebview.api.maximize_window()" title="Maximize">
+                        <i class="bi bi-arrows-angle-expand"></i>
+                    </span>
+                    <span class="control-close" onclick="window.pywebview.api.close_window()" title="Close">
+                        <i class="bi bi-x-lg"></i>
+                    </span>
+                </div>
+            </div>
+
+            <div class="app-layout">
+                <!-- Sidebar Kiri Mumble -->
+                <div class="sidebar">
+                    <div class="sidebar-top-section">
+                        <!-- Kotak Pencarian -->
+                        <div class="search-container">
+                            <div class="search-box">
+                                <input type="text" placeholder="Search..." id="searchInput">
+                                <span class="search-shortcut">Ctrl+K</span>
+                            </div>
+                        </div>
+
+                        <!-- Tab Navigasi -->
+                        <div class="sidebar-tabs">
+                            <button class="tab-btn active" onclick="switchTab('channels')">Channels</button>
+                            <button class="tab-btn" onclick="switchTab('members')">Members</button>
+                        </div>
+
+                        <!-- Konten List Channel -->
+                        <div class="tab-content-area">
+                            <div id="tab-channels" class="tab-pane active">
+                                <div class="list-category">DAFTAR CHANNEL RADIO</div>
+                                <div id="channelListContainer">
+                                    <!-- Channel dimuat dinamis dari API Python -->
+                                </div>
+                            </div>
+
+                            <div id="tab-members" class="tab-pane">
+                                <div class="list-category">ONLINE USERS</div>
+                                <div id="onlineMembersContainer">
+                                    <!-- Daftar Member Online -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Bawah Sidebar -->
+                    <div class="sidebar-footer">
+                        <div class="user-panel-top">
+                            <div class="user-profile-box">
+                                <div class="user-avatar" id="userAvatarInitials">
+                                    US
+                                    <span class="user-avatar-dot"></span>
+                                </div>
+                                <span class="user-badge-guest" id="userChannelBadge">K3I POLDA BALI</span>
+                            </div>
+
+                            <!-- Tombol Mic Mute -->
+                            <button class="audio-ctrl-btn mic-active" id="btnToggleGlobalMic" onclick="toggleGlobalMic()" title="Mute/Unmute Microphone">
+                                <i class="bi bi-mic-fill" id="globalMicIcon"></i>
+                            </button>
+
+                            <!-- Tombol Deafen Audio -->
+                            <button class="audio-ctrl-btn speaker-active" id="btnToggleGlobalDeafen" onclick="toggleGlobalDeafen()" title="Deafen Audio">
+                                <i class="bi bi-headphones" id="globalDeafenIcon"></i>
+                            </button>
+                        </div>
+
+                        <div class="user-panel-bottom">
+                            <button class="btn-footer-icon" title="Information" onclick="showInfo()">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                            <button class="btn-footer-icon" title="Settings" onclick="openSettings()">
+                                <i class="bi bi-gear"></i>
+                            </button>
+                            <button class="btn-disconnect" onclick="logout()">
+                                <i class="bi bi-box-arrow-right" style="font-size: 15px;"></i> Disconnect
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Area Kanan Utama -->
+                <div class="main-content">
+                    <div class="channel-top-header">
+                        <div class="channel-title-left">
+                            <span style="font-weight: bold; font-size: 16px;">#</span>
+                            <span id="currentChannelTitle">K3I POLDA BALI</span>
+                            <span style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-left: 8px;">(Channel Aktif)</span>
+                        </div>
+                        <span id="pttIndicator" style="font-size: 11px; color: var(--accent-green); font-weight: 600;">STANDBY</span>
+                    </div>
+
+                    <div class="content-body-split">
+                        <!-- Kolom Chat -->
+                        <div class="chat-column">
+                            <div class="whatsapp-chat-container" id="chatContainer">
+                                <div class="chat-bubble incoming">
+                                    <span class="bubble-sender">Sistem Dispatcher</span>
+                                    <span class="bubble-text">Kanal komunikasi ROIP TIK Polda Bali terhubung dan stabil.</span>
+                                    <span class="bubble-time">12:30</span>
+                                </div>
+                            </div>
+
+                            <!-- Panel Input Pesan -->
+                            <div class="chat-input-panel">
+                                <input type="text" class="chat-input-box" id="messageInput" placeholder="Ketik pesan chat..." onkeypress="handleKeyPress(event)">
+                                <button class="btn-send" onclick="sendMessage()" id="sendBtn" title="Kirim Pesan" disabled style="opacity: 0.5; cursor: not-allowed;">
+                                    <i class="bi bi-send-fill"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Sidebar Kanan Khusus Tombol PTT -->
+                        <div class="ptt-sidebar">
+                            <div class="ptt-sidebar-content">
+                                <div class="ptt-title">Tombol PTT</div>
+                                <div class="ptt-instruction">Tekan lama atau spasi keyboard untuk berbicara</div>
+
+                                <!-- Tombol PTT Bulat -->
+                                <button class="ptt-round-btn" id="pttButton" onmousedown="startPTT()" onmouseup="stopPTT()" ontouchstart="startPTT()" ontouchend="stopPTT()"
+                                    title="Tekan atau Spasi untuk Bicara">
+                                    <i class="bi bi-mic-fill"></i>
+                                    <span id="pttBtnText">PTT</span>
+                                </button>
+
+                                <div class="ptt-channel-badge" id="pttActiveChannelBadge">
+                                    # K3I POLDA BALI
+                                </div>
+                            </div>
+
+                            <div class="ptt-activity-box">
+                                <span class="ptt-activity-label">Sedang Berbicara :</span>
+                                <span class="ptt-activity-name" id="activeSpeakerName">Belum ada transmisi</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Socket.io Client & SweetAlert2 -->
+        <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.2/dist/socket.io.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+        <script>
+            let socket = null;
+            let currentUser = null;
+            let currentRoomId = 1; // Default Room ID
+            let activeChannelId = null;
+            let isMicMuted = false;
+            let isDeafened = false;
+
+            // Objek untuk menyimpan shortcuts dinamis dari settings.json
+            let userShortcuts = {
+                pushToTalk: "Mouse 2 (Right)",
+                toggleMute: "Ctrl+A",
+                toggleDeafen: "Ctrl+J"
+            };
+
+            // Ambil elemen input dan tombol kirim
+            const messageInput = document.getElementById('messageInput');
+            const sendBtn = document.getElementById('sendBtn');
+
+            // Pantau setiap ada perubahan/ketikan pada input chat
+            if (messageInput && sendBtn) {
+                messageInput.addEventListener('input', function () {
+                    const text = messageInput.value.trim();
+                    if (text.length > 0) {
+                        sendBtn.removeAttribute('disabled');
+                        sendBtn.style.opacity = '1';
+                        sendBtn.style.cursor = 'pointer';
+                    } else {
+                        sendBtn.setAttribute('disabled', 'true');
+                        sendBtn.style.opacity = '0.5';
+                        sendBtn.style.cursor = 'not-allowed';
+                    }
+                });
+            }
+
+            // Fungsi untuk memuat pengaturan aplikasi & shortcuts dari backend Python
+            async function loadAppSettings() {
+                if (window.pywebview && window.pywebview.api.load_settings_from_json) {
+                    try {
+                        const settings = await window.pywebview.api.load_settings_from_json();
+                        if (settings && settings.shortcuts) {
+                            userShortcuts = settings.shortcuts;
+                            console.log("[SETTINGS] Shortcuts dinamis dimuat:", userShortcuts);
+                        }
+                    } catch (e) {
+                        console.error("Gagal memuat pengaturan shortcuts:", e);
+                    }
+                }
+            }
+
+            // Saat pywebview siap dimuat
+            // Saat pywebview siap dimuat
+            window.addEventListener('pywebviewready', async function () {
+                if (window.pywebview && window.pywebview.api.apply_window_state) {
+                    window.pywebview.api.apply_window_state();
+                }
+
+                // Muat pengaturan shortcuts terlebih dahulu
+                await loadAppSettings();
+
+                try {
+                    const configRes = await window.pywebview.api.get_config_json();
+                    let serverUrl = "http://10.18.200.21:3002";
+
+                    if (configRes.success) {
+                        serverUrl = `http://${configRes.ip_server}:${configRes.port}`;
+                    }
+
+                    const sessionRes = await window.pywebview.api.get_session_data();
+                    if (sessionRes.success && sessionRes.user) {
+                        currentUser = sessionRes.user;
+
+                        // [PERBAIKAN UTAMA] Jika sesi user belum ada current_room, 
+                        // kita bisa ambil paksa dari API online members atau set default dari room pertama yang diload nanti
+                        setupUserInterface(currentUser);
+
+                        // Muat daftar room/channel dari backend Python
+                        await loadUserRooms();
+
+                        initSocket(sessionRes.token || "rahasia_secure_24101981", currentUser.id, serverUrl);
+                    } else {
+                        window.location.href = 'login.html';
+                    }
+                } catch (e) {
+                    console.error("Gagal memuat sesi:", e);
+                    window.location.href = 'login.html';
+                }
+            });
+
+            function setupUserInterface(user) {
+                document.getElementById('loggedInUserName').innerHTML = `
+            <i class="bi bi-check-circle" style="color: #22c55e; margin-right: 4px;"></i> ${escapeHtml(user.full_name)} (${user.role.toUpperCase()})
+        `;
+
+                const initials = user.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                document.getElementById('userAvatarInitials').innerHTML = `${initials}<span class="user-avatar-dot"></span>`;
+            }
+
+            // --- MANAJEMEN STATUS KONEKSI & UI BADGE ---
+            let wasOffline = false;
+            let isServerAlertOpen = false;
+            let isInternetAlertOpen = false;
+
+            // Fungsi helper untuk mengubah status badge via class CSS
+            function updateStatusUI(state, text) {
+                const badgeElement = document.getElementById('connection-status-badge');
+                const statusText = document.getElementById('status-text');
+
+                if (!badgeElement || !statusText) return;
+
+                // Hapus semua kelas status sebelumnya
+                badgeElement.classList.remove('online', 'restored', 'offline');
+
+                // Tambahkan kelas baru ('online', 'restored', atau 'offline')
+                badgeElement.classList.add(state);
+
+                // Perbarui teks keterangan
+                statusText.innerText = text;
+            }
+
+            // Dipanggil otomatis saat Python/Socket mendeteksi server lokal terputus
+            function showServerConnectionLostAlert() {
+                if (!wasOffline) {
+                    wasOffline = true;
+                    updateStatusUI('offline', 'Offline');
+                }
+
+                if (isServerAlertOpen) return;
+                isServerAlertOpen = true;
+
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Koneksi Server Lokal Terputus!',
+                    html: `Tidak dapat terhubung ke server pusat.<br>Periksa kabel jaringan/switch atau pastikan server aktif.`,
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    showConfirmButton: true,
+                    confirmButtonText: '<i class="bi bi-arrow-clockwise"></i> Coba Lagi',
+                    confirmButtonColor: '#3085d6',
+                    showDenyButton: true,
+                    denyButtonText: '<i class="bi bi-box-arrow-right"></i> Keluar Aplikasi',
+                    denyButtonColor: '#d33'
+                }).then((result) => {
+                    isServerAlertOpen = false;
+
+                    // JIKA TOMBOL "KELUAR APLIKASI" (Deny) DIKLIK
+                    if (result.isDenied) {
+                        if (window.pywebview && window.pywebview.api && window.pywebview.api.close_window) {
+                            window.pywebview.api.close_window();
+                        } else {
+                            // Fallback jika dibuka di browser biasa (bukan pywebview)
+                            window.close();
+                        }
+                        return;
+                    }
+
+                    // JIKA TOMBOL "COBA LAGI" (Confirm) DIKLIK
+                    if (result.isConfirmed) {
+                        // Tampilkan loading reconnect
+                        Swal.fire({
+                            title: 'Menghubungkan ulang...',
+                            text: 'Mencoba menghubungi server...',
+                            allowOutsideClick: false,
+                            didOpen: () => {
+                                Swal.showLoading();
+
+                                setTimeout(async () => {
+                                    let serverConnected = false;
+
+                                    try {
+                                        // 1. Cek apakah socket.io benar-benar terhubung
+                                        if (socket && socket.connected) {
+                                            serverConnected = true;
+                                        }
+                                        // 2. ATAU jika Anda punya fungsi di Python untuk tes TCP ping (misal: check_server_status)
+                                        else if (window.pywebview && window.pywebview.api.check_server_status) {
+                                            const res = await window.pywebview.api.check_server_status();
+                                            if (res && res.success) serverConnected = true;
+                                        }
+                                    } catch (err) {
+                                        serverConnected = false;
+                                    }
+
+                                    if (serverConnected) {
+                                        // Jika benar-benar sudah terhubung
+                                        Swal.close();
+                                        handleConnectionRestored();
+                                    } else {
+                                        // Jika masih gagal/offline, tutup loading lalu munculkan kembali peringatan offline
+                                        Swal.fire({
+                                            icon: 'error',
+                                            title: 'Masih Gagal Terhubung',
+                                            text: 'Jaringan ke server belum pulih. Silakan coba beberapa saat lagi.',
+                                            allowOutsideClick: false,
+                                            allowEscapeKey: false,
+                                            confirmButtonText: 'OK'
+                                        }).then(() => {
+                                            showServerConnectionLostAlert();
+                                        });
+                                    }
+                                }, 3000);
+                            }
+                        });
+                    }
+                });
+            }
+
+            // Dipanggil otomatis saat koneksi server pulih / kembali online
+            function handleConnectionRestored() {
+                if (wasOffline) {
+                    wasOffline = false;
+
+                    // Tahap 1: Tampilkan teks "Anda kembali online" (Warna Kuning)
+                    updateStatusUI('restored', 'Anda kembali online');
+
+                    // Tahap 2: Setelah 3 detik, kembalikan menjadi "Online" (Warna Hijau)
+                    setTimeout(() => {
+                        if (!wasOffline) {
+                            updateStatusUI('online', 'Online');
+                        }
+                    }, 3000);
+                }
+            }
+
+            // Fungsi Peringatan jika Koneksi Internet Terputus (Untuk Akses CSS/JS CDN)
+            function showInternetConnectionLostAlert() {
+                if (isInternetAlertOpen) return;
+                isInternetAlertOpen = true;
+
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Koneksi Internet Terputus',
+                    html: `Akses internet terdeteksi terganggu.<br>Tampilan antarmuka (CSS/JS online) mungkin tidak sempurna.`,
+                    allowOutsideClick: true,
+                    allowEscapeKey: true,
+                    confirmButtonText: 'Mengerti',
+                    confirmButtonColor: '#3085d6',
+                    timer: 10000
+                }).then(() => {
+                    isInternetAlertOpen = false;
+                });
+            }
+
+            // Inisialisasi Socket.io dengan parameter serverUrl dinamis
+            function initSocket(token, userId, serverUrl) {
+                console.log("[SOCKET LOG] Mencoba menghubungkan ke:", serverUrl);
+
+                // [PENTING] Putus socket lama jika sudah ada agar tidak terjadi koneksi ganda (double socket)
+                if (typeof socket !== 'undefined' && socket) {
+                    socket.disconnect();
+                    socket = null;
+                }
+
+                socket = io(serverUrl, {
+                    auth: { token: token },
+                    forceNew: true
+                });
+
+                // 1. Minta data user online saat socket berhasil terhubung
+                socket.on('connect', () => {
+                    console.log("[SOCKET LOG] Berhasil terhubung! Socket ID:", socket.id);
+
+                    // Pastikan mengambil ID yang valid, utamakan dari currentUser.id atau localStorage
+                    const activeUserId = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? currentUser.id : localStorage.getItem('user_id');
+
+                    if (activeUserId && activeUserId !== 'undefined') {
+                        socket.emit('register_user_socket', activeUserId);
+                    } else {
+                        console.error("[ERROR] User ID tidak valid atau undefined:", activeUserId);
+                    }
+
+                    // Panggil event untuk meminta daftar user online dari server
+                    socket.emit('get_online_users');
+
+                    if (typeof handleConnectionRestored === 'function') {
+                        handleConnectionRestored();
+                    }
+                });
+
+                // 2. Tanggapilah data yang dikirim balik oleh server untuk dirender ke UI
+                socket.on('current_online_users', (users) => {
+                    console.log("[SOCKET LOG] Daftar user online diterima:", users);
+
+                    // Panggil fungsi render online members secara langsung
+                    if (typeof renderOnlineMembers === 'function') {
+                        renderOnlineMembers(users);
+                    }
+                });
+
+                socket.on('disconnect', (reason) => {
+                    console.warn("[SOCKET LOG] Terputus dari server. Alasan:", reason);
+                    showServerConnectionLostAlert();
+                });
+
+                socket.on('connect_error', (err) => {
+                    console.error("[SOCKET LOG ERROR] Gagal koneksi:", err.message);
+                });
+
+                socket.on('update_user_connection', (data) => {
+                    console.log("[SOCKET] Update koneksi user:", data);
+
+                    // Minta ulang data user online dan refresh list member
+                    socket.emit('get_online_users');
+                    loadOnlineMembers();
+                });
+
+                socket.on('user_room_changed', (data) => {
+                    console.log("[SOCKET] User pindah room:", data);
+
+                    // Minta ulang data user online dan refresh list member
+                    socket.emit('get_online_users');
+                    loadOnlineMembers();
+                });
+            }
+
+            // Fungsi untuk memuat daftar room/channel secara dinamis dari server via Python
+            async function loadUserRooms() {
+                if (window.pywebview && window.pywebview.api.fetch_user_rooms) {
+                    try {
+                        const res = await window.pywebview.api.fetch_user_rooms();
+                        if (res.success && res.rooms && res.rooms.length > 0) {
+                            renderChannelList(res.rooms);
+                        } else {
+                            console.warn("Gagal memuat rooms atau data kosong:", res.message);
+                        }
+                    } catch (e) {
+                        console.error("Terjadi kesalahan saat mengambil rooms:", e);
+                    }
+                }
+            }
+
+            // Fungsi untuk merender array rooms ke dalam elemen HTML
+            function renderChannelList(rooms) {
+                const container = document.getElementById('channelListContainer');
+                if (!container) return;
+
+                container.innerHTML = '';
+
+                // DEBUG: Cek isi data user dan current_room
+                console.log("[DEBUG] currentUser saat render:", currentUser);
+                console.log("[DEBUG] Daftar rooms dari server:", rooms);
+
+                let userCurrentRoom = null;
+                if (currentUser && currentUser.current_room !== undefined && currentUser.current_room !== null && currentUser.current_room !== "") {
+                    userCurrentRoom = String(currentUser.current_room).trim();
+                }
+
+                console.log("[DEBUG] userCurrentRoom yang dicari:", userCurrentRoom);
+
+                rooms.forEach((room, index) => {
+                    // Ambil berbagai kemungkinan key ID atau Nama dari objek room
+                    const roomId = String(room.id || room.room_id || room.channel_code || room.room_code || index).trim();
+                    const roomName = String(room.name || room.channel_name || room.room_name || room.title || '').trim();
+
+                    // Pencocokan fleksibel (bisa berdasarkan ID atau Nama Room)
+                    let isMatched = false;
+                    if (userCurrentRoom) {
+                        const matchById = roomId === userCurrentRoom;
+                        const matchByName = roomName.toLowerCase() === userCurrentRoom.toLowerCase();
+                        isMatched = matchById || matchByName;
+                    }
+
+                    const isFirst = (index === 0 && !userCurrentRoom);
+
+                    const isActive = (isMatched || isFirst) ? 'active' : '';
+                    const micClass = (isMatched || isFirst) ? 'mic-active' : '';
+
+                    const rowHtml = `
+                        <div class="channel-row ${isActive}" id="row-${roomId}" onclick="selectChannel('${roomId}', '${escapeHtml(roomName)}')">
+                            <div class="channel-name-left">
+                                <span>${escapeHtml(roomName)}</span>
+                            </div>
+                            <div class="channel-mini-actions" onclick="event.stopPropagation()">
+                                <button class="btn-mini-ctrl ${micClass}" id="mic-${roomId}" onclick="toggleMic('${roomId}', '${escapeHtml(roomName)}')" title="Pilih Transmit">
+                                    <i class="bi bi-mic"></i>
+                                </button>
+                                <button class="btn-mini-ctrl speaker-active" id="speaker-${roomId}" onclick="toggleSpeaker('${roomId}')" title="Mute/Unmute Audio">
+                                    <i class="bi bi-volume-down"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('beforeend', rowHtml);
+                });
+
+                if (rooms.length > 0) {
+                    let targetRoom = rooms[0]; // Default ke atas
+
+                    if (userCurrentRoom) {
+                        const found = rooms.find(r => {
+                            const rId = String(r.id || r.room_id || r.channel_code || r.room_code || '').trim();
+                            const rName = String(r.name || r.channel_name || r.room_name || r.title || '').trim().toLowerCase();
+                            return rId === userCurrentRoom || rName === userCurrentRoom.toLowerCase();
+                        });
+                        if (found) {
+                            targetRoom = found;
+                            console.log("[DEBUG] Room yang cocok ditemukan:", targetRoom);
+                        } else {
+                            console.warn("[DEBUG] Tidak ada room yang cocok dengan current_room, menggunakan default index 0.");
+                        }
+                    }
+
+                    const targetId = targetRoom.id || targetRoom.room_id || targetRoom.channel_code || targetRoom.room_code || 0;
+                    const targetName = targetRoom.name || targetRoom.channel_name || targetRoom.room_name || targetRoom.title || 'Channel Radio';
+
+                    selectChannel(targetId, targetName);
+                }
+            }
+
+            // --- MANAJEMEN MEMBER ONLINE ---
+            async function loadOnlineMembers() {
+                if (window.pywebview && window.pywebview.api.fetch_online_members) {
+                    try {
+                        const res = await window.pywebview.api.fetch_online_members();
+                        if (res.success && res.data) {
+                            renderOnlineMembers(res.data);
+                        }
+                    } catch (e) {
+                        console.error("Gagal memuat member online:", e);
+                    }
+                }
+            }
+
+            function renderOnlineMembers(members) {
+                const container = document.getElementById('onlineMembersContainer');
+                if (!container) return;
+
+                container.innerHTML = '';
+
+                if (members.length === 0) {
+                    container.innerHTML = '<div style="padding: 10px; font-size: 12px; color: var(--text-muted); text-align: center;">Tidak ada member online</div>';
+                    return;
+                }
+
+                const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#10b981', '#06b6d4'];
+
+                members.forEach((member, index) => {
+                    const name = member.full_name || member.username || 'User';
+                    const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                    const avatarColor = colors[index % colors.length];
+                    const roomBadgeText = member.current_room_name ? member.current_room_name.toUpperCase() : 'BELUM PILIH ROOM';
+
+                    const rowHtml = `
+                        <div class="member-row" id="member-${member.id}">
+                            <div class="member-left">
+                                <div class="member-avatar" style="background-color: ${avatarColor};">
+                                    ${initials}
+                                    <span class="member-avatar-dot"></span>
+                                </div>
+                                <div class="member-info">
+                                    <span class="member-username">${escapeHtml(name)}</span>
+                                </div>
+                            </div>
+                            <span class="member-badge-room">${escapeHtml(roomBadgeText)}</span>
+                    </div>
+                  `;
+                    container.insertAdjacentHTML('beforeend', rowHtml);
+                });
+            }
+
+            function switchTab(tabName) {
+                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+
+                if (tabName === 'channels') {
+                    document.querySelector('.sidebar-tabs button:nth-child(1)').classList.add('active');
+                    document.getElementById('tab-channels').classList.add('active');
+                } else {
+                    document.querySelector('.sidebar-tabs button:nth-child(2)').classList.add('active');
+                    document.getElementById('tab-members').classList.add('active');
+                    loadOnlineMembers();
+                }
+            }
+
+            async function selectChannel(id, channelName) {
+                activeChannelId = id;
+                currentRoomId = id;
+
+                // [PERBAIKAN] Update juga current_room di objek currentUser frontend secara lokal
+                if (currentUser) {
+                    currentUser.current_room = id;
+                }
+
+                document.getElementById('currentChannelTitle').innerText = channelName;
+                document.getElementById('userChannelBadge').innerText = channelName.toUpperCase();
+                document.getElementById('pttActiveChannelBadge').innerText = `# ${channelName.toUpperCase()}`;
+
+                document.querySelectorAll('.channel-row').forEach(row => row.classList.remove('active'));
+                const currentRow = document.getElementById(`row-${id}`);
+                if (currentRow) currentRow.classList.add('active');
+
+                setActiveMic(id);
+
+                if (socket && socket.connected) {
+                    socket.emit('join_channel', String(id));
+                }
+
+                if (window.pywebview && window.pywebview.api.switch_room) {
+                    window.pywebview.api.switch_room(id).catch(err => {
+                        console.error("Gagal switch room di backend:", err);
+                    });
+                }
+
+                await loadChannelChats(id);
+            }
+
+            async function loadChannelChats(roomId) {
+                const chatContainer = document.getElementById('chatContainer');
+                chatContainer.innerHTML = '';
+
+                if (window.pywebview && window.pywebview.api.fetch_channel_chats) {
+                    try {
+                        const res = await window.pywebview.api.fetch_channel_chats(roomId);
+                        if (res.success && res.chats && res.chats.length > 0) {
+                            res.chats.forEach(chat => {
+                                const isOutgoing = currentUser && chat.user_id === currentUser.id;
+                                appendChatMessage(chat.username || "Operator", chat.message, chat.created_at, isOutgoing);
+                            });
+                        } else {
+                            chatContainer.innerHTML = `
+                        <div class="chat-bubble incoming">
+                            <span class="bubble-sender">Sistem Dispatcher</span>
+                            <span class="bubble-text">Belum ada riwayat pesan di channel ini. Mulai percakapan sekarang.</span>
+                            <span class="bubble-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                    `;
+                        }
+                    } catch (e) {
+                        console.error("Gagal memuat riwayat chat:", e);
+                    }
+                }
+            }
+
+            function toggleMic(id, channelName) {
+                selectChannel(id, channelName);
+            }
+
+            function setActiveMic(id) {
+                document.querySelectorAll('.btn-mini-ctrl[id^="mic-"]').forEach(btn => {
+                    btn.classList.remove('mic-active');
+                    btn.innerHTML = '<i class="bi bi-mic"></i>';
+                });
+
+                const targetMic = document.getElementById(`mic-${id}`);
+                if (targetMic) {
+                    targetMic.classList.add('mic-active');
+                    targetMic.innerHTML = '<i class="bi bi-mic-fill"></i>';
+                }
+            }
+
+            function toggleSpeaker(id) {
+                const btn = document.getElementById(`speaker-${id}`);
+                if (btn.classList.contains('speaker-active')) {
+                    btn.classList.remove('speaker-active');
+                    btn.classList.add('speaker-muted');
+                    btn.innerHTML = '<i class="bi bi-volume-mute"></i>';
+                } else {
+                    btn.classList.remove('speaker-muted');
+                    btn.classList.add('speaker-active');
+                    btn.innerHTML = '<i class="bi bi-volume-down"></i>';
+                }
+            }
+
+            function toggleGlobalMic() {
+                isMicMuted = !isMicMuted;
+                const btn = document.getElementById('btnToggleGlobalMic');
+                const icon = document.getElementById('globalMicIcon');
+
+                if (isMicMuted) {
+                    btn.classList.add('mic-muted');
+                    icon.className = 'bi bi-mic-mute-fill';
+                    btn.classList.remove('mic-active');
+                } else {
+                    btn.classList.remove('mic-muted');
+                    icon.className = 'bi bi-mic-fill';
+                    btn.classList.add('mic-active');
+                }
+            }
+
+            function toggleGlobalDeafen() {
+                isDeafened = !isDeafened;
+                const btn = document.getElementById('btnToggleGlobalDeafen');
+                const icon = document.getElementById('globalDeafenIcon');
+
+                if (isDeafened) {
+                    btn.classList.remove('speaker-active');
+                    btn.classList.add('mic-muted');
+                    icon.className = 'bi bi-volume-mute-fill fs-12';
+                } else {
+                    btn.classList.add('speaker-active');
+                    btn.classList.remove('mic-muted');
+                    icon.className = 'bi bi-headphones';
+                }
+            }
+
+            function openSettings() {
+                window.location.href = 'settings.html';
+            }
+
+            function showInfo() {
+                Swal.fire({
+                    title: 'ROIP TIK Polda Bali',
+                    text: 'Sistem Dispatcher Console berbasis P25 atau ROIP Gateway untuk operasional Kepolisian Daerah Bali.',
+                    icon: 'info',
+                    confirmButtonText: 'Tutup'
+                });
+            }
+
+            function sendMessage() {
+                const input = document.getElementById('messageInput');
+                const text = input.value.trim();
+                if (!text || !currentUser) return;
+
+                if (socket) {
+                    socket.emit('send_channel_chat', {
+                        roomId: currentRoomId,
+                        userId: currentUser.id,
+                        username: currentUser.full_name,
+                        message: text
+                    });
+                }
+
+                appendChatMessage(currentUser.full_name, text, new Date(), true);
+                input.value = '';
+
+                if (sendBtn) {
+                    sendBtn.setAttribute('disabled', 'true');
+                    sendBtn.style.opacity = '0.5';
+                    sendBtn.style.cursor = 'not-allowed';
+                }
+            }
+
+            function appendChatMessage(sender, text, timestamp, isOutgoing) {
+                const chatContainer = document.getElementById('chatContainer');
+                const time = new Date(timestamp);
+                const timeString = time.getHours().toString().padStart(2, '0') + ':' + time.getMinutes().toString().padStart(2, '0');
+
+                const bubble = document.createElement('div');
+                bubble.className = `chat-bubble ${isOutgoing ? 'outgoing' : 'incoming'}`;
+
+                let senderHtml = isOutgoing ? '' : `<span class="bubble-sender">${escapeHtml(sender)}</span>`;
+                bubble.innerHTML = `
+            ${senderHtml}
+            <span class="bubble-text">${escapeHtml(text)}</span>
+            <span class="bubble-time">${timeString}</span>
+        `;
+
+                chatContainer.appendChild(bubble);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+
+            function handleKeyPress(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            }
+
+            function escapeHtml(string) {
+                return string.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            }
+
+            // Kontrol Tombol PTT terhubung ke PyAudio Backend
+            const pttBtn = document.getElementById('pttButton');
+            const pttIndicator = document.getElementById('pttIndicator');
+            const pttBtnText = document.getElementById('pttBtnText');
+            const activeSpeakerName = document.getElementById('activeSpeakerName');
+
+            function startPTT() {
+                if (isMicMuted) return;
+                pttBtn.classList.add('active');
+                if (pttBtnText) pttBtnText.innerText = "ON AIR";
+                pttIndicator.innerText = "TRANSMISI ON AIR";
+                pttIndicator.style.color = "#ef4444";
+
+                if (currentUser) {
+                    activeSpeakerName.innerText = currentUser.full_name;
+                }
+
+                if (window.pywebview && window.pywebview.api.start_ptt) {
+                    window.pywebview.api.start_ptt();
+                }
+            }
+
+            function stopPTT() {
+                pttBtn.classList.remove('active');
+                if (pttBtnText) pttBtnText.innerText = "PTT";
+                pttIndicator.innerText = "STANDBY";
+                pttIndicator.style.color = "#22c55e";
+                activeSpeakerName.innerText = "Belum ada transmisi";
+
+                if (window.pywebview && window.pywebview.api.release_ptt) {
+                    window.pywebview.api.release_ptt(currentRoomId, currentUser ? currentUser.id : 1).then(res => {
+                        console.log("Audio PTT streaming selesai:", res);
+                    });
+                }
+            }
+
+            // --- PENCOCOKKAN SHORTCUT DINAMIS ---
+            function matchesShortcut(e, shortcutString) {
+                if (!shortcutString) return false;
+                const parts = shortcutString.toLowerCase().split('+');
+                const hasCtrl = parts.includes('ctrl');
+                const hasShift = parts.includes('shift');
+                const hasAlt = parts.includes('alt');
+                const mainKey = parts[parts.length - 1];
+
+                const ctrlMatch = hasCtrl === e.ctrlKey;
+                const shiftMatch = hasShift === e.shiftKey;
+                const altMatch = hasAlt === e.altKey;
+
+                let keyMatch = false;
+                if (mainKey === 'space' && e.code === 'Space') keyMatch = true;
+                else if (e.key.toLowerCase() === mainKey) keyMatch = true;
+
+                return ctrlMatch && shiftMatch && altMatch && keyMatch;
+            }
+
+            let isShortcutPressed = false;
+
+            window.addEventListener('keydown', (e) => {
+                if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+                    return;
+                }
+
+                if (userShortcuts.pushToTalk && !userShortcuts.pushToTalk.toLowerCase().includes('mouse')) {
+                    if (matchesShortcut(e, userShortcuts.pushToTalk)) {
+                        if (!isShortcutPressed) {
+                            isShortcutPressed = true;
+                            e.preventDefault();
+                            startPTT();
+                        }
+                        return;
+                    }
+                }
+
+                if (matchesShortcut(e, userShortcuts.toggleMute)) {
+                    e.preventDefault();
+                    toggleGlobalMic();
+                    return;
+                }
+
+                if (matchesShortcut(e, userShortcuts.toggleDeafen)) {
+                    e.preventDefault();
+                    toggleGlobalDeafen();
+                    return;
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+                    return;
+                }
+
+                if (userShortcuts.pushToTalk && !userShortcuts.pushToTalk.toLowerCase().includes('mouse')) {
+                    if (matchesShortcut(e, userShortcuts.pushToTalk)) {
+                        if (isShortcutPressed) {
+                            isShortcutPressed = false;
+                            e.preventDefault();
+                            stopPTT();
+                        }
+                    }
+                }
+            });
+
+            window.addEventListener('mousedown', (e) => {
+                if (e.button === 2 && userShortcuts.pushToTalk && userShortcuts.pushToTalk.toLowerCase().includes('mouse')) {
+                    startPTT();
+                }
+            });
+
+            window.addEventListener('mouseup', (e) => {
+                if (e.button === 2 && userShortcuts.pushToTalk && userShortcuts.pushToTalk.toLowerCase().includes('mouse')) {
+                    stopPTT();
+                }
+            });
+
+            window.addEventListener('contextmenu', (e) => {
+                if (userShortcuts.pushToTalk && userShortcuts.pushToTalk.toLowerCase().includes('mouse')) {
+                    e.preventDefault();
+                }
+            });
+
+            function logout() {
+                Swal.fire({
+                    title: 'Putuskan Koneksi?',
+                    text: 'Anda akan memutuskan sambungan dan keluar dari sesi aktif konsol dispatching saat ini.',
+                    icon: 'warning',
+                    iconColor: '#ef4444',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ef4444',
+                    cancelButtonColor: '#334155',
+                    confirmButtonText: 'Disconnect',
+                    cancelButtonText: 'Batal',
+                    backdrop: true,
+                    allowOutsideClick: false,
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        if (socket) {
+                            socket.disconnect();
+                        }
+
+                        // Panggil fungsi Python untuk memuat halaman login secara lokal
+                        if (window.pywebview && window.pywebview.api.go_to_login) {
+                            try {
+                                await window.pywebview.api.go_to_login();
+                            } catch (err) {
+                                console.error("Gagal berpindah ke halaman login:", err);
+                            }
+                        }
+                    }
+                });
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const titleBar = document.querySelector('.title-bar');
+
+                if (titleBar) {
+                    let isMouseDown = false;
+                    let startX = 0;
+                    let startY = 0;
+
+                    titleBar.addEventListener('mousedown', (e) => {
+                        if (e.target.closest('.title-controls') || e.target.closest('.connection-badge')) {
+                            return;
+                        }
+                        isMouseDown = true;
+                        startX = e.clientX;
+                        startY = e.clientY;
+                    });
+
+                    window.addEventListener('mousemove', (e) => {
+                        if (!isMouseDown) return;
+
+                        // Hitung jarak pergerakan mouse (geseran / drag)
+                        const moveX = Math.abs(e.clientX - startX);
+                        const moveY = Math.abs(e.clientY - startY);
+
+                        // Jika mouse bergeser lebih dari 5 piksel, anggap ini sebagai aksi DRAG
+                        if (moveX > 5 || moveY > 5) {
+                            isMouseDown = false; // Matikan agar tidak terpanggil terus menerus
+
+                            if (window.pywebview && window.pywebview.api && window.pywebview.api.reset_window_size) {
+                                window.pywebview.api.reset_window_size();
+                            }
+                        }
+                    });
+
+                    window.addEventListener('mouseup', () => {
+                        isMouseDown = false;
+                    });
+                }
+            });
+        </script>
+    </body>
+
+</html>
