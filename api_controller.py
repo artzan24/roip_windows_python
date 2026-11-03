@@ -48,6 +48,13 @@ class RoIPLoginAPI:
 
         self.mic_volume = 100
         self.speaker_volume = 100
+
+        # --- INISIALISASI STATE CONTROL ---
+        self.is_mic_muted = False
+        self.is_speaker_muted = False
+        self.was_transmitting = False
+        self.ptt_start_time = 0
+        self.is_ptt_active = False
         
         # Inisialisasi Thread Lock untuk keamanan akses memori audio secara multi-thread
         self.audio_lock = threading.Lock()
@@ -269,6 +276,7 @@ class RoIPLoginAPI:
             "micVolume": "100",
             "speakerVolume": "100",
             "activationMode": "Voice Activation",
+            "voiceThreshold": "-40",
             "hardwareInterface": {
                 "enableHardwarePTT": False,
                 "serialPort": "",
@@ -289,13 +297,21 @@ class RoIPLoginAPI:
 
         if os.path.exists(SETTINGS_FILE):
             try:
-                with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-                    saved_data = json.load(f)
+                if os.path.getsize(SETTINGS_FILE) == 0:
+                    return default_settings
+
+                # Gunakan encoding 'utf-8-sig' untuk mencegah error karakter tersembunyi/BOM
+                with open(SETTINGS_FILE, 'r', encoding='utf-8-sig') as f:
+                    content = f.read().strip()
+                    if not content:
+                        return default_settings
+                    
+                    saved_data = json.loads(content)
                     if isinstance(saved_data, dict):
                         default_settings.update(saved_data)
                     return default_settings
             except Exception as e:
-                print("Gagal membaca settings.json:", e)
+                print(f"[SETTINGS ERROR] Gagal membaca settings.json (menggunakan default): {e}")
                 
         return default_settings
 
@@ -318,6 +334,7 @@ class RoIPLoginAPI:
                 self.current_user = res_data.get("data")
                 
                 self.connect_socket()
+                self.start_background_recording_if_needed()
 
                 print(f"[SUKSES] Login berhasil untuk user: {self.current_user.get('full_name')}")
                 
@@ -371,54 +388,51 @@ class RoIPLoginAPI:
             return {"success": False, "message": str(e)}
 
     def _get_device_index(self, device_name, is_output=False):
-        """Mencari index device, otomatis fallback ke System default jika cocok dengan default OS"""
-        if not device_name or device_name == "System default" or device_name == "":
+        """Mencari index device secara aman, kompatibel antara nama pilihan UI dan PyAudio."""
+        if not device_name or device_name == "System default" or device_name.strip() == "":
+            print("[AUDIO INFO] Menggunakan perangkat System default.")
             return None
         
         try:
-            import sounddevice as sd
-            devices = sd.query_devices()
-            
-            # 1. Cek perangkat default yang sedang aktif di sistem operasi saat ini
-            default_indices = sd.default.device
-            default_idx = default_indices[1] if is_output else default_indices[0]
-            
-            if default_idx is not None and 0 <= default_idx < len(devices):
-                default_dev_name = devices[default_idx]['name']
+            # Cari langsung berdasarkan kecocokan nama di PyAudio agar indeksnya 100% akurat untuk streaming
+            device_count = self.pyaudio_instance.get_device_count()
+            for i in range(device_count):
+                dev_info = self.pyaudio_instance.get_device_info_by_index(i)
+                dev_name = dev_info.get('name', '')
                 
-                # Jika perangkat yang diklik user (misal 'Headphones') ternyata adalah 
-                # perangkat default aktif di Windows, perlakukan sebagai System Default (return None)
-                if (device_name.strip().lower() in default_dev_name.strip().lower() or 
-                    default_dev_name.strip().lower() in device_name.strip().lower()):
-                    print(f"[AUDIO INFO] '{device_name}' adalah default sistem saat ini. Menggunakan jalur System Default.")
-                    return None
-
-            # 2. Jika bukan default sistem, cari berdasarkan kecocokan nama perangkat biasa
-            for dev in devices:
-                if device_name.strip().lower() in dev['name'].strip().lower():
-                    if is_output and dev['max_output_channels'] > 0:
-                        return dev['index']
-                    elif not is_output and dev['max_input_channels'] > 0:
-                        return dev['index']
-                        
+                channels = dev_info.get('maxOutputChannels') if is_output else dev_info.get('maxInputChannels')
+                if channels > 0:
+                    # Cocokkan nama dari pengaturan dengan hardware PyAudio
+                    if device_name.strip().lower() in dev_name.strip().lower() or dev_name.strip().lower() in device_name.strip().lower():
+                        print(f"[AUDIO INFO] Perangkat PyAudio cocok: '{dev_name}' pada indeks {i}")
+                        return i
         except Exception as e:
-            print(f"[ERROR] Gagal mencari device index: {e}")
-            
-        # Jika tidak ketemu atau gagal, kembalikan None (System default) agar tetap aman
+            print(f"[ERROR] Gagal mencocokkan device index PyAudio: {e}")
+        
+        # Fallback ke System Default jika tidak ditemukan
+        print(f"[AUDIO WARNING] Perangkat '{device_name}' tidak ditemukan. Fallback ke System default.")
         return None
 
     def test_speaker(self, output_device_name=None):
-        """Fungsi yang dipanggil dari JavaScript untuk test speaker dengan penerapan Volume Speaker"""
+        """Memutar melodi tes audio berdurasi panjang (~10-12 detik) dengan opsi stop manual."""
         try:
-            duration = 1.0  # 1 detik
-            frequency = 440.0  # Nada A4
+            self.is_playing_speaker_test = True
+            notes = [523.25, 659.25, 783.99, 1046.50, 783.99, 659.25, 523.25] 
+            note_duration = 0.4 
             
-            t = np.linspace(0, duration, int(self.RATE * duration), endpoint=False)
-            raw_wave = np.sin(2 * np.pi * frequency * t) * 32767
+            single_pattern = np.array([], dtype=np.float32)
+            for freq in notes:
+                t = np.linspace(0, note_duration, int(self.RATE * note_duration), endpoint=False)
+                envelope = np.sin(np.pi * t / note_duration) 
+                wave = np.sin(2 * np.pi * freq * t) * envelope * 32767
+                single_pattern = np.concatenate((single_pattern, wave))
+                
+            silence = np.zeros(int(self.RATE * 0.3), dtype=np.float32)
+            single_full_loop = np.concatenate((single_pattern, silence))
+            complete_wave = np.tile(single_full_loop, 4)
             
-            # Terapkan Speaker Volume secara global
             speaker_scale = float(self.speaker_volume) / 100.0
-            scaled_wave = (raw_wave * speaker_scale).astype(np.int16).tobytes()
+            scaled_wave = (complete_wave * speaker_scale).astype(np.int16).tobytes()
 
             output_index = self._get_device_index(output_device_name, is_output=True)
 
@@ -431,13 +445,25 @@ class RoIPLoginAPI:
                 frames_per_buffer=self.CHUNK
             )
 
-            stream.write(scaled_wave)
+            # Potong chunk kecil-kecil agar bisa mendeteksi perintah STOP secara real-time
+            chunk_size = self.CHUNK
+            for i in range(0, len(scaled_wave), chunk_size):
+                if not getattr(self, 'is_playing_speaker_test', False):
+                    break
+                chunk = scaled_wave[i:i+chunk_size]
+                stream.write(chunk)
+
             stream.stop_stream()
             stream.close()
-            return {"success": True, "message": "Test speaker berhasil diputar."}
+            return {"success": True, "message": "Test speaker selesai / dihentikan."}
         except Exception as e:
             print(f"[SPEAKER TEST ERROR] {e}")
             return {"success": False, "message": str(e)}
+
+    def stop_speaker_test(self):
+        """Menghentikan tes speaker secara manual."""
+        self.is_playing_speaker_test = False
+        return {"success": True}
 
     def start_mic_test_record(self, input_device_name=None):
         try:
@@ -602,6 +628,7 @@ class RoIPLoginAPI:
     def go_to_login(self):
         try:
             self.is_recording = False
+            self.is_monitoring_voice = False
             
             if self.sio.connected:
                 self.sio.disconnect()
@@ -723,7 +750,36 @@ class RoIPLoginAPI:
         if self.sio.connected:
             self.sio.emit('join_channel', str(channel_id))
             
+        # [PENTING] Pastikan background recording langsung berjalan otomatis 
+        # jika mode aktif adalah Voice Activation atau Continuous
+        self.start_background_recording_if_needed()
+            
         return self.roip_manager.set_active_channel(channel_id)
+
+    def start_background_recording_if_needed(self):
+        """Memulai rekaman otomatis di background jika mode bukan Push to Talk"""
+        try:
+            settings = self.load_settings_from_json()
+            activation_mode = settings.get("activationMode", "Voice Activation")
+            
+            # Jika mode Voice Activation atau Continuous, jalankan thread rekam otomatis
+            if activation_mode in ["Voice Activation", "Continuous"]:
+                with self.audio_lock:
+                    if not getattr(self, 'is_recording', False):
+                        self.is_recording = True
+                        self.ptt_start_time = time.time()
+                        
+                        # Jalankan thread rekam dan streaming
+                        self.recording_thread = threading.Thread(target=self._record_and_stream_loop)
+                        self.recording_thread.daemon = True
+                        self.recording_thread.start()
+                        print(f"[AUDIO] Background recording dimulai otomatis untuk mode: {activation_mode}")
+            else:
+                # Jika mode Push to Talk, pastikan rekaman berhenti jika sebelumnya menyala otomatis
+                if getattr(self, 'is_recording', False) and not getattr(self, 'is_ptt_active', False):
+                    self.is_recording = False
+        except Exception as e:
+            print(f"[AUDIO ERROR] Gagal memulai background recording: {e}")
 
     def fetch_channel_chats(self, room_id):
         if not self.auth_token:
@@ -743,6 +799,7 @@ class RoIPLoginAPI:
         
         with self.audio_lock:
             self.is_recording = True
+            self.is_ptt_active = True  # Set status PTT aktif menjadi True
             self.ptt_start_time = time.time()
 
         try:
@@ -753,22 +810,18 @@ class RoIPLoginAPI:
             ptt_pin = hw_interface.get("pttPin", "RTS").upper()
             baud_rate = int(hw_interface.get("baudRate", 9600))
 
-            # Validasi ketersediaan port COM yang dipilih di sistem
-            import serial.tools.list_ports
             available_ports = [p.device for p in serial.tools.list_ports.comports()]
 
             if is_hardware_enabled and com_port in available_ports:
                 self.ser_ptt = serial.Serial(com_port, baud_rate, timeout=1)
-                
                 if ptt_pin == "DTR":
                     self.ser_ptt.setDTR(True)
                 else:
                     self.ser_ptt.setRTS(True)
-                    
                 print(f"[HARDWARE PTT] Port {com_port} terdeteksi dan AKTIF.")
             else:
                 if is_hardware_enabled:
-                    print(f"[HARDWARE PTT INFO] Port {com_port} tidak terdeteksi (mungkin dicabut). Menggunakan mode software murni.")
+                    print(f"[HARDWARE PTT INFO] Port {com_port} tidak terdeteksi. Menggunakan mode software murni.")
                 else:
                     print("[HARDWARE PTT] Dinonaktifkan pada pengaturan.")
         except Exception as e:
@@ -783,18 +836,29 @@ class RoIPLoginAPI:
                 'username': username
             })
 
-        self.recording_thread = threading.Thread(target=self._record_and_stream_loop)
-        self.recording_thread.daemon = True
-        self.recording_thread.start()
+        # [PERBAIKAN] Cek aman apakah self.recording_thread ada dan aktif
+        thread_is_active = False
+        if hasattr(self, 'recording_thread') and self.recording_thread is not None:
+            try:
+                thread_is_active = self.recording_thread.is_alive()
+            except Exception:
+                thread_is_active = False
+
+        if not thread_is_active:
+            self.recording_thread = threading.Thread(target=self._record_and_stream_loop)
+            self.recording_thread.daemon = True
+            self.recording_thread.start()
         
         return {"success": True}
 
     def _record_and_stream_loop(self):
-        """Looping menangkap stream audio mikrofon, menerapkan global mic_volume, dan streaming ke server."""
+        """Looping menangkap stream audio mikrofon & mengirimkan data saat PTT aktif."""
         try:
             settings = self.load_settings_from_json()
+            activation_mode = settings.get("activationMode", "Push to Talk")
             input_device_name = settings.get("inputDevice", "System default")
             input_index = self._get_device_index(input_device_name, is_output=False)
+            threshold_db = float(settings.get("voiceThreshold", -40))
 
             stream = self.pyaudio_instance.open(
                 format=self.FORMAT,
@@ -807,23 +871,161 @@ class RoIPLoginAPI:
             
             while self.is_recording:
                 data = stream.read(self.CHUNK, exception_on_overflow=False)
-                if data and self.sio.connected:
-                    # Terapkan global Microphone Volume pada audio PTT keluar
-                    mic_scale = float(self.mic_volume) / 100.0
-                    audio_chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32)
-                    scaled_chunk = audio_chunk * mic_scale
-                    processed_data = np.clip(scaled_chunk, -32768, 32767).astype(np.int16).tobytes()
-                    
-                    self.sio.emit('audio_stream', processed_data)
+                if not data or not self.sio.connected:
+                    continue
+
+                if getattr(self, 'is_mic_muted', False):
+                    continue
+
+                mic_scale = float(self.mic_volume) / 100.0
+                audio_chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32)
+                scaled_audio_chunk = audio_chunk * mic_scale
+                
+                rms = np.sqrt(np.mean(scaled_audio_chunk**2)) if len(scaled_audio_chunk) > 0 else 0
+                db_value = (20 * np.log10(rms / 32768.0)) if rms > 0 else -100.0
+                db_value = max(-60.0, min(0.0, db_value))
+
+                # Evaluasi status transmisi berdasarkan mode
+                is_transmitting = False
+                if activation_mode == "Continuous":
+                    is_transmitting = True
+                elif activation_mode == "Push to Talk":
+                    # [PENTING] Pastikan membaca self.is_ptt_active
+                    is_transmitting = getattr(self, 'is_ptt_active', False)
+                elif activation_mode == "Voice Activation":
+                    if db_value >= threshold_db:
+                        is_transmitting = True
+
+                if self.window:
+                    try:
+                        self.window.evaluate_js(f"updateVoiceActivityIndicator({db_value:.1f}, {1 if is_transmitting else 0})")
+                    except:
+                        pass
+
+                # Jika tidak sedang mentransmisikan, lewati pengiriman data audio
+                if not is_transmitting:
+                    time.sleep(0.01)
+                    continue
+
+                # Konversi dan kirim data biner audio ke server via Socket.io
+                processed_data = np.clip(scaled_audio_chunk, -32768, 32767).astype(np.int16).tobytes()
+                self.sio.emit('audio_stream', processed_data)
             
             stream.stop_stream()
             stream.close()
         except Exception as e:
             print(f"[ERROR PyAudio Stream] Gagal merekam/streaming: {e}")
 
+    def set_mic_muted(self, is_muted):
+        self.is_mic_muted = is_muted
+        if is_muted:
+            self.is_recording = False
+        print(f"[AUDIO] Status Global Mic Mute: {is_muted}")
+        return {"success": True}
+
+    def set_speaker_muted(self, is_muted):
+        self.is_speaker_muted = is_muted
+        # Jika speaker dimute (deafen), hentikan atau abaikan pemutaran audio masuk dari socket
+        print(f"[AUDIO] Status Global Speaker Deafen: {is_muted}")
+        return {"success": True}
+
+    def start_voice_activity_monitor(self):
+        """Memulai pemantauan mic khusus untuk indikator real-time dengan penanganan error yang aman."""
+        import threading
+        
+        # Hentikan monitor sebelumnya jika sudah aktif agar tidak terjadi bentrok stream
+        self.is_monitoring_voice = False
+        time.sleep(0.1)
+        
+        def monitor_loop():
+            stream = None
+            try:
+                settings = self.load_settings_from_json()
+                input_device_name = settings.get("inputDevice", "System default")
+                
+                # Validasi aman untuk menghindari string invalid seperti 'master'
+                if not input_device_name or str(input_device_name).lower() in ["system default", "master", ""]:
+                    input_index = None
+                else:
+                    input_index = self._get_device_index(input_device_name, is_output=False)
+                    
+                threshold_db = float(settings.get("voiceThreshold", -40))
+
+                dev_display_name = input_device_name
+                if input_index is not None:
+                    try:
+                        dev_info = self.pyaudio_instance.get_device_info_by_index(input_index)
+                        dev_display_name = dev_info.get('name', input_device_name)
+                    except Exception:
+                        input_index = None
+
+                stream = self.pyaudio_instance.open(
+                    format=self.FORMAT,
+                    channels=self.CHANNELS,
+                    rate=self.RATE,
+                    input=True,
+                    input_device_index=input_index,
+                    frames_per_buffer=self.CHUNK
+                )
+
+                self.is_monitoring_voice = True
+                
+                while getattr(self, 'is_monitoring_voice', False):
+                    try:
+                        data = stream.read(self.CHUNK, exception_on_overflow=False)
+                        if not data or not getattr(self, 'is_monitoring_voice', False):
+                            break
+
+                        audio_chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32)
+                        rms = np.sqrt(np.mean(audio_chunk**2)) if len(audio_chunk) > 0 else 0
+                        
+                        if rms > 0:
+                            db_value = 20 * np.log10(rms / 32768.0)
+                        else:
+                            db_value = -100.0
+
+                        db_value = max(-60.0, min(0.0, db_value))
+                        is_passing = db_value >= threshold_db
+
+                        if self.window and getattr(self, 'is_monitoring_voice', False):
+                            # Escape string nama device untuk keamanan JS syntax
+                            safe_name = str(dev_display_name).replace("'", "\\'")
+                            js_code = f"if(typeof updateVoiceActivityMonitorUI === 'function') {{ updateVoiceActivityMonitorUI('{safe_name}', {db_value:.1f}, {1 if is_passing else 0}); }}"
+                            self.window.evaluate_js(js_code)
+                    except Exception:
+                        break
+
+            except Exception as e:
+                print(f"[MONITOR ERROR BERHASIL DIATASI] {e}")
+            finally:
+                if stream:
+                    try:
+                        stream.stop_stream()
+                        stream.close()
+                    except Exception:
+                        pass
+                
+                # Reset UI indikator saat monitor berhenti
+                if self.window:
+                    try:
+                        self.window.evaluate_js("if(typeof updateVoiceActivityMonitorUI === 'function') { updateVoiceActivityMonitorUI('System default', -100.0, 0); }")
+                    except Exception:
+                        pass
+
+        if not getattr(self, 'is_monitoring_voice', False):
+            threading.Thread(target=monitor_loop, daemon=True).start()
+
+        return {"success": True, "message": "Voice monitor started."}
+
+    def stop_voice_activity_monitor(self):
+        """Menghentikan pemantauan mic dengan aman."""
+        self.is_monitoring_voice = False
+        return {"success": True}
+
     def release_ptt(self, room_id=1, user_id=1):
         print("[PTT] Transmisi berhenti. Menghentikan streaming...")
         self.is_recording = False
+        self.is_ptt_active = False  # [PENTING] Matikan status PTT aktif
         
         if self.recording_thread and self.recording_thread.is_alive():
             self.recording_thread.join(timeout=1.0)
@@ -843,7 +1045,7 @@ class RoIPLoginAPI:
                     self.ser_ptt.setRTS(False)
 
                 self.ser_ptt.close()
-                print("[HARDWARE PTT] Pin PTT dimatikan (False / RECEIVE) & Port ditutup.")
+                print("[HARDWARE PTT] Pin PTT dimatikan & Port ditutup.")
         except Exception as e:
             print(f"[HARDWARE PTT ERROR] Gagal mematikan pin PTT: {e}")
 

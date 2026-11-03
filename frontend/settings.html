@@ -1,1511 +1,1893 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
-
-    <head>
-        <meta charset="UTF-8">
-        <title>Fancy Mumble - Settings</title>
-        <!-- Bootstrap Icons -->
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-        <style>
-            * {
-                box-sizing: border-box;
-                margin: 0;
-                padding: 0;
-                font-family: 'Inter', sans-serif;
-            }
-
-            :root {
-                --bg-primary: #182232;
-                --bg-secondary: rgba(24, 34, 50, 0.85);
-                --bg-tertiary: #111722;
-                --text-normal: #e2e8f0;
-                --text-muted: #94a3b8;
-                --accent-green: #22c55e;
-                --accent-red: #ef4444;
-                --accent-orange: #f59e0b;
-                --accent-blue: #38bdf8;
-                --hover-bg: rgba(51, 65, 85, 0.5);
-                --active-bg: rgba(30, 58, 138, 0.4);
-                --border-color: rgba(51, 65, 85, 0.3);
-                --bg-card: rgba(30, 41, 59, 0.4);
-            }
-
-            html,
-            body {
-                background-color: transparent !important;
-                color: var(--text-normal);
-                width: 100vw;
-                height: 100vh;
-                overflow: hidden;
-                user-select: none;
-            }
-
-            ::-webkit-scrollbar {
-                width: 4px;
-                height: 4px;
-            }
-
-            ::-webkit-scrollbar-track {
-                background: transparent;
-            }
-
-            ::-webkit-scrollbar-thumb {
-                background: rgba(156, 163, 175, 0.2);
-                border-radius: 2px;
-            }
-
-            .window-container {
-                display: flex;
-                flex-direction: column;
-                height: 100vh;
-                width: 100vw;
-                overflow: hidden;
-            }
-
-            /* Title Bar Custom */
-            .title-bar {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 12px 15px;
-                background-color: var(--bg-tertiary);
-                border-bottom: 1px solid var(--border-color);
-                z-index: 1000;
-                flex-shrink: 0;
-                user-select: none;
-
-                /* KUNCI UTAMA DARI PYWEBVIEW */
-                -webkit-app-region: drag;
-            }
-
-            /* 2. Pastikan tombol kontrol, badge status, dan elemen interaktif di dalam title-bar TIDAK BISA di-drag */
-            .title-controls,
-            .title-controls * {
-                -webkit-app-region: no-drag;
-            }
-
-            /* Hapus atau biarkan tanpa app-region */
-            .title-left {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                font-size: 13px;
-                color: var(--text-muted);
-            }
-
-            .app-name {
-                color: var(--text-normal);
-                font-weight: 600;
-            }
-
-            .badge-friends {
-                background-color: #2b2d31;
-                padding: 4px 10px;
-                border-radius: 6px;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                font-size: 11px;
-            }
-
-            .title-controls {
-                display: flex;
-                gap: 16px;
-                color: var(--text-muted);
-                font-size: 14px;
-                cursor: pointer;
-                -webkit-app-region: no-drag;
-            }
-
-            .title-controls span:hover {
-                color: var(--text-normal);
-            }
-
-            .control-close:hover {
-                color: var(--accent-red) !important;
-            }
-
-            /* Layout Utama Settings */
-            .app-layout {
-                display: flex;
-                flex: 1;
-                width: 100%;
-                height: calc(100vh - 45px);
-                overflow: hidden;
-                background-color: var(--bg-primary);
-                -webkit-app-region: no-drag;
-            }
-
-            /* Sidebar Kiri Navigasi Settings */
-            .settings-sidebar {
-                width: 260px;
-                min-width: 260px;
-                background-color: var(--bg-secondary);
-                backdrop-filter: blur(10px);
-                border-right: 1px solid var(--border-color);
-                display: flex;
-                flex-direction: column;
-                padding: 16px 12px;
-                gap: 12px;
-                height: 100%;
-            }
-
-            .back-btn {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                color: var(--text-muted);
-                font-size: 13px;
-                font-weight: 600;
-                background: transparent;
-                border: none;
-                cursor: pointer;
-                padding: 8px 10px;
-                border-radius: 8px;
-                transition: 0.2s;
-                text-align: left;
-            }
-
-            .back-btn:hover {
-                color: var(--text-normal);
-                background-color: var(--hover-bg);
-            }
-
-            .settings-category-title {
-                font-size: 11px;
-                font-weight: 700;
-                color: var(--text-muted);
-                letter-spacing: 0.5px;
-                text-transform: uppercase;
-                padding: 0 8px;
-                margin-top: 6px;
-            }
-
-            .settings-nav-list {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-                overflow-y: auto;
-            }
-
-            .nav-item {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                padding: 10px 12px;
-                border-radius: 8px;
-                font-size: 13px;
-                font-weight: 500;
-                color: var(--text-muted);
-                cursor: pointer;
-                transition: 0.15s;
-                background: transparent;
-                border: none;
-                width: 100%;
-                text-align: left;
-            }
-
-            .nav-item:hover {
-                background-color: var(--hover-bg);
-                color: var(--text-normal);
-            }
-
-            .nav-item.active {
-                background-color: var(--active-bg);
-                color: var(--text-normal);
-                font-weight: 600;
-                border: 1px solid rgba(56, 189, 248, 0.2);
-            }
-
-            /* Area Kanan Konten Tab Settings */
-            .settings-content-area {
-                flex: 1;
-                padding: 30px 40px;
-                overflow-y: auto;
-                display: flex;
-                flex-direction: column;
-                background-color: #090d16;
-                background-image:
-                    linear-gradient(135deg, #090d16 0%, #0f172a 45%, #1e293b 100%),
-                    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.025'/%3E%3C/svg%3E");
-            }
-
-            .settings-tab-pane {
-                display: none;
-                flex-direction: column;
-                gap: 24px;
-            }
-
-            .settings-tab-pane.active {
-                display: flex;
-            }
-
-            .settings-header h2 {
-                font-size: 20px;
-                font-weight: 700;
-                color: var(--text-normal);
-            }
-
-            .settings-row {
-                display: flex;
-                gap: 20px;
-                width: 100%;
-            }
-
-            .settings-group {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-            }
-
-            .settings-group label {
-                font-size: 12px;
-                font-weight: 600;
-                color: var(--text-normal);
-            }
-
-            .settings-select {
-                background-color: var(--bg-card);
-                border: 1px solid var(--border-color);
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: var(--text-normal);
-                font-size: 13px;
-                outline: none;
-                cursor: pointer;
-            }
-
-            .slider-container {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                font-size: 12px;
-                color: var(--text-muted);
-                margin-top: 4px;
-            }
-
-            .settings-slider {
-                width: 100%;
-                accent-color: var(--accent-blue);
-                cursor: pointer;
-                margin-top: 6px;
-            }
-
-            .section-subtitle {
-                font-size: 12px;
-                color: var(--text-muted);
-                margin-top: -10px;
-                margin-bottom: 4px;
-            }
-
-            .activation-grid {
-                display: grid;
-                grid-template-columns: repeat(3, 1fr);
-                gap: 12px;
-            }
-
-            .activation-card {
-                background-color: var(--bg-card);
-                border: 1px solid var(--border-color);
-                border-radius: 10px;
-                padding: 16px;
-                display: flex;
-                flex-direction: column;
-                gap: 8px;
-                cursor: pointer;
-                transition: 0.2s;
-            }
-
-            .activation-card:hover {
-                border-color: rgba(56, 189, 248, 0.4);
-            }
-
-            .activation-card.active {
-                background-color: var(--active-bg);
-                border-color: var(--accent-blue);
-            }
-
-            .activation-card i {
-                font-size: 20px;
-                color: var(--accent-blue);
-            }
-
-            .card-title {
-                font-size: 13px;
-                font-weight: 650;
-                color: var(--text-normal);
-            }
-
-            .card-desc {
-                font-size: 11px;
-                color: var(--text-muted);
-                line-height: 1.4;
-            }
-
-            /* Indikator status simpan otomatis */
-            .save-status {
-                font-size: 11px;
-                color: var(--accent-green);
-                margin-left: auto;
-                opacity: 0;
-                transition: opacity 0.3s ease;
-            }
-
-            .save-status.show {
-                opacity: 1;
-            }
-
-            /* Styling Custom Select */
-            .custom-select-wrapper {
-                position: relative;
-                user-select: none;
-                width: 100%;
-            }
-
-            .custom-select-trigger {
-                background-color: var(--bg-card);
-                border: 1px solid var(--border-color);
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: var(--text-normal);
-                font-size: 13px;
-                cursor: pointer;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                transition: border-color 0.2s;
-            }
-
-            .custom-select-trigger:hover {
-                border-color: rgba(56, 189, 248, 0.4);
-            }
-
-            .custom-options {
-                position: absolute;
-                top: calc(100% + 4px);
-                left: 0;
-                right: 0;
-                background-color: #1e293b;
-                border: 1px solid var(--border-color);
-                border-radius: 8px;
-                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-                max-height: 200px;
-                overflow-y: auto;
-                display: none;
-                z-index: 9999;
-            }
-
-            .custom-select.open .custom-options {
-                display: block;
-            }
-
-            .custom-option {
-                padding: 10px 12px;
-                font-size: 13px;
-                color: var(--text-normal);
-                cursor: pointer;
-                transition: background-color 0.15s;
-            }
-
-            .custom-option:hover {
-                background-color: rgba(51, 65, 85, 0.5);
-            }
-
-            .custom-option.selected {
-                background-color: rgba(30, 58, 138, 0.4);
-                color: var(--accent-blue);
-                font-weight: 600;
-            }
-
-            /* Styling Toggle Switch */
-            .toggle-switch {
-                position: relative;
-                display: inline-block;
-                width: 46px;
-                height: 24px;
-                flex-shrink: 0;
-            }
-
-            .toggle-switch input {
-                opacity: 0;
-                width: 0;
-                height: 0;
-            }
-
-            .toggle-slider {
-                position: absolute;
-                cursor: pointer;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background-color: #334155;
-                transition: 0.25s;
-                border-radius: 24px;
-            }
-
-            .toggle-slider:before {
-                position: absolute;
-                content: "";
-                height: 18px;
-                width: 18px;
-                left: 3px;
-                bottom: 3px;
-                background-color: white;
-                transition: 0.25s;
-                border-radius: 50%;
-            }
-
-            .toggle-switch input:checked+.toggle-slider {
-                background-color: var(--accent-blue, #38bdf8);
-            }
-
-            .toggle-switch input:checked+.toggle-slider:before {
-                transform: translateX(22px);
-            }
-
-            /* Styling SweetAlert2 */
-            .swal2-popup {
-                font-size: 0.85rem !important;
-                width: 24rem !important;
-                padding: 1.25rem !important;
-                border-radius: 1rem !important;
-                background-color: #0f172a !important;
-                color: #f1f5f9 !important;
-                border: 1px solid #1e293b !important;
-            }
-
-            .swal2-popup .swal2-icon {
-                transform: scale(0.75);
-                margin: 0.5rem auto 1rem auto !important;
-            }
-
-            .swal2-popup .swal2-title {
-                font-size: 1.1rem !important;
-                font-weight: 600 !important;
-                color: inherit !important;
-            }
-
-            .swal2-popup .swal2-html-container {
-                font-size: 0.8rem !important;
-                color: #94a3b8 !important;
-            }
-
-            .swal2-popup .swal2-styled {
-                font-size: 0.75rem !important;
-                padding: 0.5rem 1rem !important;
-                border-radius: 0.5rem !important;
-            }
-
-            .swal2-popup .swal2-confirm {
-                background-color: #2563eb !important;
-            }
-
-            .swal2-popup .swal2-cancel {
-                background-color: #475569 !important;
-            }
-
-            .swal2-container.swal2-backdrop-show {
-                background: rgba(0, 0, 0, 0.4) !important;
-                backdrop-filter: blur(4px) !important;
-                -webkit-backdrop-filter: blur(4px) !important;
-            }
-        </style>
-    </head>
-
-    <body>
-        <div class="window-container">
-            <!-- Title Bar Custom -->
-            <div class="title-bar pywebview-drag-region">
-                <div class="title-left">
-                    <span class="app-name"><i class="bi bi-info-circle" style="padding-right: 5px;"></i> ROIP TIK Polda Bali</span>
-                    <span class="badge-friends">
-                        <i class="bi bi-gear" style="color: #fff;"></i> Pengaturan Aplikasi
-                    </span>
-
-                </div>
-                <div class="title-controls">
-                    <span class="control-minimize" onclick="window.pywebview.api.minimize_window()" title="Minimize">
-                        <i class="bi bi-dash"></i>
-                    </span>
-                    <span class="control-maximize" onclick="window.pywebview.api.maximize_window()" title="Maximize">
-                        <i class="bi bi-arrows-angle-expand"></i>
-                    </span>
-                    <span class="control-close" onclick="goBack()" title="Close">
-                        <i class="bi bi-x-lg"></i>
-                    </span>
-                </div>
-            </div>
-
-            <div class="app-layout">
-                <!-- Sidebar Kiri Navigasi Tab Settings -->
-                <div class="settings-sidebar">
-                    <button class="back-btn" onclick="goBack()">
-                        <i class="bi bi-chevron-left"></i> Back
-                    </button>
-
-                    <div class="settings-category-title">Settings</div>
-                    <div class="settings-nav-list">
-                        <button class="nav-item" onclick="switchSettingsTab('profile', this)"><i class="bi bi-person"></i> Profile</button>
-                        <button class="nav-item active" onclick="switchSettingsTab('audio', this)"><i class="bi bi-headphones"></i> Audio</button>
-                        <button class="nav-item" onclick="switchSettingsTab('voice', this)"><i class="bi bi-mic"></i> Voice</button>
-                        <button class="nav-item" onclick="switchSettingsTab('shortcuts', this)"><i class="bi bi-keyboard"></i> Shortcuts</button>
-                        <button class="nav-item" onclick="switchSettingsTab('identities', this)"><i class="bi bi-shield-lock"></i> Identities</button>
-                        <button class="nav-item" onclick="switchSettingsTab('notifications', this)"><i class="bi bi-bell"></i> Notifications</button>
-                    </div>
-                </div>
-
-                <!-- Area Kanan Konten (Berdasarkan Tab Aktif) -->
-                <div class="settings-content-area">
-
-                    <div id="tab-audio" class="settings-tab-pane active">
-                        <div class="settings-header" style="display: flex; align-items: center; gap: 12px;">
-                            <h2>Audio dan Perangkat</h2>
-                            <button onclick="refreshAudioDevices()" title="Refresh Perangkat Audio"
-                                style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 10px; color: var(--accent-blue); cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 6px; transition: 0.2s;">
-                                <i class="bi bi-arrow-clockwise" id="refresh-icon"></i> Refresh Audio
-                            </button>
-                            <span id="saveStatus" class="save-status"><i class="bi bi-check2"></i> Perubahan disimpan ke JSON</span>
-                        </div>
-
-                        <div class="settings-row">
-                            <!-- Input Device (Microphone) Section -->
-                            <div class="settings-group">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <label style="margin-bottom: 0;">Input Device</label>
-                                </div>
-                                <div class="custom-select-wrapper" id="wrapper-inputDevice">
-                                    <div class="custom-select" id="custom-inputDevice">
-                                        <div class="custom-select-trigger">
-                                            <span id="label-inputDevice">System default</span>
-                                            <i class="bi bi-chevron-down"></i>
-                                        </div>
-                                        <div class="custom-options" id="options-inputDevice">
-                                            <div class="custom-option selected" data-value="System default"
-                                                onclick="selectCustomOption('inputDevice', 'System default', 'System default')">System default</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <input type="hidden" id="inputDevice" value="System default" onchange="saveSettingsData()">
-
-                                <!-- Tombol, Meteran, & Status ala Zoom -->
-                                <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px;">
-                                    <button onclick="toggleMicTest()" id="btnMicTest" type="button" class="btn-test-audio"
-                                        style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 12px; color: var(--accent-green); cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                        <i class="bi bi-mic-fill" id="micTestIcon"></i> <span id="micTestText">Test microphone</span>
-                                    </button>
-
-                                    <!-- Kotak Level Meter -->
-                                    <div class="audio-meter" style="display: flex; gap: 3px; flex-grow: 1;" id="micMeter">
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                    </div>
-                                </div>
-                                <!-- Teks status kecil di bawah tombol ala Zoom -->
-                                <div id="micStatusText" style="font-size: 11px; color: var(--text-secondary, #666); margin-top: 4px; min-height: 16px;"></div>
-
-                                <div class="slider-container" style="margin-top: 12px;">
-                                    <span>Microphone Volume</span>
-                                    <span id="micVolText" style="color: var(--accent-blue); font-weight: 600;">100%</span>
-                                </div>
-                                <input type="range" class="settings-slider" id="micVolume" min="0" max="100" value="100" oninput="updateSliderLabel('micVolume', 'micVolText', '%')"
-                                    onchange="saveSettingsData()">
-                            </div>
-
-                            <!-- Output Device (Speaker) Section -->
-                            <div class="settings-group">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <label style="margin-bottom: 0;">Output Device</label>
-                                </div>
-                                <div class="custom-select-wrapper" id="wrapper-outputDevice">
-                                    <div class="custom-select" id="custom-outputDevice">
-                                        <div class="custom-select-trigger">
-                                            <span id="label-outputDevice">System default</span>
-                                            <i class="bi bi-chevron-down"></i>
-                                        </div>
-                                        <div class="custom-options" id="options-outputDevice">
-                                            <div class="custom-option selected" data-value="System default"
-                                                onclick="selectCustomOption('outputDevice', 'System default', 'System default')">System default</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <input type="hidden" id="outputDevice" value="System default" onchange="saveSettingsData()">
-
-                                <!-- Tombol & Meteran Test Speaker (Gaya Zoom) -->
-                                <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px;">
-                                    <button onclick="runSpeakerTest()" type="button" class="btn-test-audio"
-                                        style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 12px; color: var(--accent-blue); cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                                        <i class="bi bi-volume-up-fill"></i> Test speaker
-                                    </button>
-                                    <!-- Kotak Level Meter (8 blok indikator) -->
-                                    <div class="audio-meter" style="display: flex; gap: 3px; flex-grow: 1;" id="speakerMeter">
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                        <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px;"></div>
-                                    </div>
-                                </div>
-                                <div style="font-size: 11px; color: var(--text-secondary, #666); margin-top: 4px; min-height: 16px;"></div>
-
-                                <div class="slider-container" style="margin-top: 12px;">
-                                    <span>Speaker Volume</span>
-                                    <span id="speakerVolText" style="color: var(--accent-blue); font-weight: 600;">100%</span>
-                                </div>
-                                <input type="range" class="settings-slider" id="speakerVolume" min="0" max="100" value="100"
-                                    oninput="updateSliderLabel('speakerVolume', 'speakerVolText', '%')" onchange="saveSettingsData()">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- TAB 1: VOICE -->
-                    <div id="tab-voice" class="settings-tab-pane">
-                        <div class="settings-header" style="display: flex; align-items: center; gap: 12px;">
-                            <h2>Voice</h2>
-                            <span id="saveStatus" class="save-status"><i class="bi bi-check2"></i> Perubahan disimpan ke JSON</span>
-                        </div>
-
-                        <div class="settings-group" style="margin-top: 4px;">
-                            <label>Activation Mode</label>
-                            <div class="section-subtitle">Choose how your microphone is activated.</div>
-
-                            <div class="activation-grid">
-                                <div class="activation-card active" id="mode-voice" onclick="setActivationMode('Voice Activation')">
-                                    <i class="bi bi-soundwave"></i>
-                                    <div class="card-title">Voice Activation</div>
-                                    <div class="card-desc">Transmits while you talk. The mic opens when audio crosses the threshold.</div>
-                                </div>
-                                <div class="activation-card" id="mode-continuous" onclick="setActivationMode('Continuous')">
-                                    <i class="bi bi-broadcast"></i>
-                                    <div class="card-title">Continuous</div>
-                                    <div class="card-desc">Always transmits. Best when you are alone in a quiet room.</div>
-                                </div>
-                                <div class="activation-card" id="mode-ptt" onclick="setActivationMode('Push to Talk')">
-                                    <i class="bi bi-mic-fill"></i>
-                                    <div class="card-title">Push to Talk</div>
-                                    <div class="card-desc">Transmits only while a hotkey is held. Set the key under Shortcuts.</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Pengaturan Hardware Serial / DTRS untuk Radio RIG Interfacing -->
-                        <div class="settings-group" style="margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <label>Radio RIG Hardware Interface (DTRS / COM Port)</label>
-                                    <div class="section-subtitle" style="margin-bottom: 0; margin-top: 0px !important;">Konfigurasi komunikasi serial USB-to-RS232 atau Port COM
-                                        untuk pemicu PTT
-                                        hardware</div>
-                                </div>
-                                <!-- Toggle Switch Hardware PTT Ditambahkan di Samping Kanan -->
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span style="font-size: 11px; color: var(--text-muted);">Aktifkan Hardware PTT</span>
-                                    <label class="toggle-switch">
-                                        <input type="checkbox" id="enableHardwarePTT" onchange="saveSettingsData()">
-                                        <span class="toggle-slider"></span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="settings-row" style="margin-top: 12px; gap: 16px;">
-                                <!-- Pilihan Port COM -->
-                                <div class="settings-group" style="flex: 1;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; height: 18px;">
-                                        <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 0;">Serial Port (COM)</label>
-                                        <span onclick="loadComPorts()"
-                                            style="font-size: 11px; color: var(--accent-blue); cursor: pointer; display: flex; align-items: center; gap: 4px;"
-                                            title="Cari ulang port COM">
-                                            <i class="bi bi-arrow-clockwise"></i> Refresh
-                                        </span>
-                                    </div>
-                                    <div class="custom-select-wrapper" id="wrapper-serialPort">
-                                        <div class="custom-select" id="custom-serialPort">
-                                            <div class="custom-select-trigger">
-                                                <span id="label-serialPort">Memindai Port...</span>
-                                                <i class="bi bi-chevron-down"></i>
-                                            </div>
-                                            <div class="custom-options" id="options-serialPort"></div>
-                                        </div>
-                                    </div>
-                                    <input type="hidden" id="serialPort" value="" onchange="saveSettingsData()">
-                                </div>
-
-                                <!-- Pilihan Pin Kontrol (DTR / RTS) -->
-                                <div class="settings-group" style="flex: 1;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; height: 18px;">
-                                        <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 0;">PTT Control Pin (DTRS)</label>
-                                    </div>
-                                    <div class="custom-select-wrapper" id="wrapper-pttPin">
-                                        <div class="custom-select" id="custom-pttPin">
-                                            <div class="custom-select-trigger">
-                                                <span id="label-pttPin">RTS</span>
-                                                <i class="bi bi-chevron-down"></i>
-                                            </div>
-                                            <div class="custom-options" id="options-pttPin">
-                                                <div class="custom-option selected" data-value="RTS" onclick="selectCustomOption('pttPin', 'RTS', 'RTS')">RTS</div>
-                                                <div class="custom-option" data-value="DTR" onclick="selectCustomOption('pttPin', 'DTR', 'DTR')">DTR</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <input type="hidden" id="pttPin" value="RTS" onchange="saveSettingsData()">
-                                </div>
-
-                                <!-- Baud Rate -->
-                                <div class="settings-group" style="flex: 1;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; height: 18px;">
-                                        <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 0;">Baud Rate</label>
-                                    </div>
-                                    <div class="custom-select-wrapper" id="wrapper-baudRate">
-                                        <div class="custom-select" id="custom-baudRate">
-                                            <div class="custom-select-trigger">
-                                                <span id="label-baudRate">9600</span>
-                                                <i class="bi bi-chevron-down"></i>
-                                            </div>
-                                            <div class="custom-options" id="options-baudRate">
-                                                <div class="custom-option selected" data-value="9600" onclick="selectCustomOption('baudRate', '9600', '9600')">9600</div>
-                                                <div class="custom-option" data-value="4800" onclick="selectCustomOption('baudRate', '4800', '4800')">4800</div>
-                                                <div class="custom-option" data-value="19200" onclick="selectCustomOption('baudRate', '19200', '19200')">19200</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <input type="hidden" id="baudRate" value="9600" onchange="saveSettingsData()">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- TAB 2: SHORTCUTS -->
-                    <div id="tab-shortcuts" class="settings-tab-pane">
-                        <div class="settings-header" style="display: flex; align-items: center; gap: 12px;">
-                            <h2>Shortcuts</h2>
-                            <span id="saveStatus" class="save-status"><i class="bi bi-check2"></i> Perubahan disimpan ke JSON</span>
-                        </div>
-                        <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-top: -14px;">
-                            Shortcuts marked <strong style="color: var(--text-normal);">global</strong> work even when the app is in the background. In-app shortcuts only fire
-                            while the window is focused.
-                        </div>
-
-                        <div style="font-size: 13px; font-weight: 700; color: var(--text-normal); margin-top: 10px;">
-                            Voice - global
-                        </div>
-
-                        <!-- Baris 1: Push to talk -->
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
-                            <span style="font-size: 13px; font-weight: 500; color: var(--text-normal);">Push to talk</span>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <div style="background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px; width: 240px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;"
-                                    onclick="startRecordShortcut(this, 'ptt')">
-                                    <span id="shortcut-ptt" style="font-size: 13px; color: var(--text-normal);">SPACE</span>
-                                    <i class="bi bi-pencil" style="font-size: 12px; color: var(--text-muted);"></i>
-                                </div>
-                                <button style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px;"
-                                    onclick="clearShortcut('shortcut-ptt')" title="Hapus Shortcut">
-                                    <i class="bi bi-x-lg"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Baris 2: Toggle mute -->
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
-                            <span style="font-size: 13px; font-weight: 500; color: var(--text-normal);">Toggle mute</span>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <div style="background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px; width: 240px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;"
-                                    onclick="startRecordShortcut(this, 'mute')">
-                                    <span id="shortcut-mute" style="font-size: 13px; color: var(--text-normal);">Ctrl+A</span>
-                                    <i class="bi bi-pencil" style="font-size: 12px; color: var(--text-muted);"></i>
-                                </div>
-                                <button style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px;"
-                                    onclick="clearShortcut('shortcut-mute')" title="Hapus Shortcut">
-                                    <i class="bi bi-x-lg"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Baris 3: Toggle deafen -->
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
-                            <span style="font-size: 13px; font-weight: 500; color: var(--text-normal);">Toggle deafen</span>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <div style="background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px; width: 240px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;"
-                                    onclick="startRecordShortcut(this, 'deafen')">
-                                    <span id="shortcut-deafen" style="font-size: 13px; color: var(--text-normal);">Ctrl+N</span>
-                                    <i class="bi bi-pencil" style="font-size: 12px; color: var(--text-muted);"></i>
-                                </div>
-                                <button style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px;"
-                                    onclick="clearShortcut('shortcut-deafen')" title="Hapus Shortcut">
-                                    <i class="bi bi-x-lg"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- TAB LAINNYA (Contoh Profile) -->
-                    <div id="tab-profile" class="settings-tab-pane">
-                        <div class="settings-header" style="display: flex; align-items: center; gap: 12px;">
-                            <h2>Profile</h2>
-                        </div>
-                        <p style="color: var(--text-muted); font-size: 13px;">Pengaturan profil operator dan informasi satker.</p>
-                    </div>
-
-                    <!-- TAB LAINNYA (Placeholder Umum) -->
-                    <div id="tab-identities" class="settings-tab-pane">
-                        <div class="settings-header" style="display: flex; align-items: center; gap: 12px;">
-                            <h2>Identities</h2>
-                        </div>
-                    </div>
-                    <!-- TAB 5: NOTIFICATIONS -->
-                    <div id="tab-notifications" class="settings-tab-pane">
-                        <div class="settings-header" style="display: flex; align-items: center;">
-                            <h2>Notifikasi</h2>
-                            <span id="saveStatus" class="save-status"><i class="bi bi-check2"></i> Perubahan disimpan ke JSON</span>
-                        </div>
-
-                        <!-- Item 1: Suara Notifikasi -->
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border-color);">
-                            <div style="display: flex; flex-direction: column; gap: 4px; max-width: 75%;">
-                                <div style="font-size: 13px; font-weight: 650; color: var(--text-normal);">Suara notifikasi</div>
-                                <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">Putar suara saat peristiwa terjadi. Peristiwa individual dapat
-                                    dikonfigurasi di bawah.</div>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="notifSound" onchange="saveSettingsData()">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-
-                        <!-- Item 2: Notifikasi Sistem (Native) -->
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border-color);">
-                            <div style="display: flex; flex-direction: column; gap: 4px; max-width: 75%;">
-                                <div style="font-size: 13px; font-weight: 650; color: var(--text-normal);">Notifikasi sistem</div>
-                                <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">Tampilkan notifikasi OS asli untuk pesan baru saat aplikasi berjalan di
-                                    latar belakang.</div>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="nativeNotif" checked onchange="saveSettingsData()">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-
-                        <!-- Item 3: Pesan Sambutan (Welcome Message) dengan Custom Select -->
-                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 5px;">
-                            <div style="font-size: 13px; font-weight: 650; color: var(--text-normal);">Pesan sambutan</div>
-                            <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">Tampilkan pesan sambutan server dalam jendela popup setelah terhubung.</div>
-
-                            <div class="custom-select-wrapper" id="wrapper-welcomeMsg" style="margin-top: 6px; max-width: 400px;">
-                                <div class="custom-select" id="custom-welcomeMsg">
-                                    <div class="custom-select-trigger">
-                                        <span id="label-welcomeMsg">Tampilkan sekali</span>
-                                        <i class="bi bi-chevron-down"></i>
-                                    </div>
-                                    <div class="custom-options" id="options-welcomeMsg">
-                                        <div class="custom-option selected" data-value="Show once" onclick="selectCustomOption('welcomeMsg', 'Show once', 'Tampilkan sekali')">
-                                            Tampilkan sekali</div>
-                                        <div class="custom-option" data-value="Always" onclick="selectCustomOption('welcomeMsg', 'Always', 'Selalu tampilkan')">Selalu tampilkan
-                                        </div>
-                                        <div class="custom-option" data-value="Never" onclick="selectCustomOption('welcomeMsg', 'Never', 'Jangan pernah')">Jangan pernah</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- Input tersembunyi untuk menyimpan data ke backend JSON -->
-                            <input type="hidden" id="welcomeMsg" value="Show once" onchange="saveSettingsData()">
-                        </div>
-                    </div>
-
-                </div>
-            </div>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Fancy Mumble - Settings</title>
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: 'Inter', sans-serif;
+      }
+
+      :root {
+        --bg-primary: #182232;
+        --bg-secondary: rgba(24, 34, 50, 0.85);
+        --bg-tertiary: #111722;
+        --text-normal: #e2e8f0;
+        --text-muted: #94a3b8;
+        --accent-green: #22c55e;
+        --accent-red: #ef4444;
+        --accent-orange: #f59e0b;
+        --accent-blue: #38bdf8;
+        --hover-bg: rgba(51, 65, 85, 0.5);
+        --active-bg: rgba(30, 58, 138, 0.4);
+        --border-color: rgba(51, 65, 85, 0.3);
+        --bg-card: rgba(30, 41, 59, 0.4);
+      }
+
+      html,
+      body {
+        background-color: transparent !important;
+        color: var(--text-normal);
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        user-select: none;
+      }
+
+      ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: rgba(156, 163, 175, 0.2);
+        border-radius: 2px;
+      }
+
+      .window-container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+      }
+
+      /* Title Bar Custom */
+      .title-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 15px;
+        background-color: var(--bg-tertiary);
+        border-bottom: 1px solid var(--border-color);
+        z-index: 1000;
+        flex-shrink: 0;
+        user-select: none;
+
+        /* KUNCI UTAMA DARI PYWEBVIEW */
+        -webkit-app-region: drag;
+      }
+
+      /* 2. Pastikan tombol kontrol, badge status, dan elemen interaktif di dalam title-bar TIDAK BISA di-drag */
+      .title-controls,
+      .title-controls * {
+        -webkit-app-region: no-drag;
+      }
+
+      /* Hapus atau biarkan tanpa app-region */
+      .title-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+
+      .app-name {
+        color: var(--text-normal);
+        font-weight: 600;
+      }
+
+      .badge-friends {
+        background-color: #2b2d31;
+        padding: 4px 10px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+      }
+
+      .title-controls {
+        display: flex;
+        gap: 16px;
+        color: var(--text-muted);
+        font-size: 14px;
+        cursor: pointer;
+        -webkit-app-region: no-drag;
+      }
+
+      .title-controls span:hover {
+        color: var(--text-normal);
+      }
+
+      .control-close:hover {
+        color: var(--accent-red) !important;
+      }
+
+      /* Layout Utama Settings */
+      .app-layout {
+        display: flex;
+        flex: 1;
+        width: 100%;
+        height: calc(100vh - 45px);
+        overflow: hidden;
+        background-color: var(--bg-primary);
+        -webkit-app-region: no-drag;
+      }
+
+      /* Sidebar Kiri Navigasi Settings */
+      .settings-sidebar {
+        width: 260px;
+        min-width: 260px;
+        background-color: var(--bg-secondary);
+        backdrop-filter: blur(10px);
+        border-right: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        padding: 16px 12px;
+        gap: 12px;
+        height: 100%;
+      }
+
+      .back-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-muted);
+        font-size: 13px;
+        font-weight: 600;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 8px 10px;
+        border-radius: 8px;
+        transition: 0.2s;
+        text-align: left;
+      }
+
+      .back-btn:hover {
+        color: var(--text-normal);
+        background-color: var(--hover-bg);
+      }
+
+      .settings-category-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-muted);
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        padding: 0 8px;
+        margin-top: 6px;
+      }
+
+      .settings-nav-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        overflow-y: auto;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-muted);
+        cursor: pointer;
+        transition: 0.15s;
+        background: transparent;
+        border: none;
+        width: 100%;
+        text-align: left;
+      }
+
+      .nav-item:hover {
+        background-color: var(--hover-bg);
+        color: var(--text-normal);
+      }
+
+      .nav-item.active {
+        background-color: var(--active-bg);
+        color: var(--text-normal);
+        font-weight: 600;
+        border: 1px solid rgba(56, 189, 248, 0.2);
+      }
+
+      /* Area Kanan Konten Tab Settings */
+      .settings-content-area {
+        flex: 1;
+        padding: 30px 40px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        background-color: #090d16;
+        background-image:
+          linear-gradient(135deg, #090d16 0%, #0f172a 45%, #1e293b 100%),
+          url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.025'/%3E%3C/svg%3E");
+      }
+
+      .settings-tab-pane {
+        display: none;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      .settings-tab-pane.active {
+        display: flex;
+      }
+
+      .settings-header h2 {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--text-normal);
+      }
+
+      .settings-row {
+        display: flex;
+        gap: 20px;
+        width: 100%;
+      }
+
+      .settings-group {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .settings-group label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-normal);
+      }
+
+      .settings-select {
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 10px 12px;
+        color: var(--text-normal);
+        font-size: 13px;
+        outline: none;
+        cursor: pointer;
+      }
+
+      .slider-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+
+      .settings-slider {
+        width: 100%;
+        accent-color: var(--accent-blue);
+        cursor: pointer;
+        margin-top: 6px;
+      }
+
+      .section-subtitle {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: -10px;
+        margin-bottom: 4px;
+      }
+
+      .activation-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+
+      .activation-card {
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+
+      .activation-card:hover {
+        border-color: rgba(56, 189, 248, 0.4);
+      }
+
+      .activation-card.active {
+        background-color: var(--active-bg);
+        border-color: var(--accent-blue);
+      }
+
+      .activation-card i {
+        font-size: 20px;
+        color: var(--accent-blue);
+      }
+
+      .card-title {
+        font-size: 13px;
+        font-weight: 650;
+        color: var(--text-normal);
+      }
+
+      .card-desc {
+        font-size: 11px;
+        color: var(--text-muted);
+        line-height: 1.4;
+      }
+
+      /* Indikator status simpan otomatis */
+      .save-status {
+        font-size: 11px;
+        color: var(--accent-green);
+        margin-left: auto;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .save-status.show {
+        opacity: 1;
+      }
+
+      /* Styling Custom Select */
+      .custom-select-wrapper {
+        position: relative;
+        user-select: none;
+        width: 100%;
+      }
+
+      .custom-select-trigger {
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 10px 12px;
+        color: var(--text-normal);
+        font-size: 13px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: border-color 0.2s;
+      }
+
+      .custom-select-trigger:hover {
+        border-color: rgba(56, 189, 248, 0.4);
+      }
+
+      .custom-options {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background-color: #1e293b;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        max-height: 200px;
+        overflow-y: auto;
+        display: none;
+        z-index: 9999;
+      }
+
+      .custom-select.open .custom-options {
+        display: block;
+      }
+
+      .custom-option {
+        padding: 10px 12px;
+        font-size: 13px;
+        color: var(--text-normal);
+        cursor: pointer;
+        transition: background-color 0.15s;
+      }
+
+      .custom-option:hover {
+        background-color: rgba(51, 65, 85, 0.5);
+      }
+
+      .custom-option.selected {
+        background-color: rgba(30, 58, 138, 0.4);
+        color: var(--accent-blue);
+        font-weight: 600;
+      }
+
+      /* Styling Toggle Switch */
+      .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 46px;
+        height: 24px;
+        flex-shrink: 0;
+      }
+
+      .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #334155;
+        transition: 0.25s;
+        border-radius: 24px;
+      }
+
+      .toggle-slider:before {
+        position: absolute;
+        content: '';
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.25s;
+        border-radius: 50%;
+      }
+
+      .toggle-switch input:checked + .toggle-slider {
+        background-color: var(--accent-blue, #38bdf8);
+      }
+
+      .toggle-switch input:checked + .toggle-slider:before {
+        transform: translateX(22px);
+      }
+
+      /* Styling SweetAlert2 */
+      .swal2-popup {
+        font-size: 0.85rem !important;
+        width: 24rem !important;
+        padding: 1.25rem !important;
+        border-radius: 1rem !important;
+        background-color: #0f172a !important;
+        color: #f1f5f9 !important;
+        border: 1px solid #1e293b !important;
+      }
+
+      .swal2-popup .swal2-icon {
+        transform: scale(0.75);
+        margin: 0.5rem auto 1rem auto !important;
+      }
+
+      .swal2-popup .swal2-title {
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        color: inherit !important;
+      }
+
+      .swal2-popup .swal2-html-container {
+        font-size: 0.8rem !important;
+        color: #94a3b8 !important;
+      }
+
+      .swal2-popup .swal2-styled {
+        font-size: 0.75rem !important;
+        padding: 0.5rem 1rem !important;
+        border-radius: 0.5rem !important;
+      }
+
+      .swal2-popup .swal2-confirm {
+        background-color: #2563eb !important;
+      }
+
+      .swal2-popup .swal2-cancel {
+        background-color: #475569 !important;
+      }
+
+      .swal2-container.swal2-backdrop-show {
+        background: rgba(0, 0, 0, 0.4) !important;
+        backdrop-filter: blur(4px) !important;
+        -webkit-backdrop-filter: blur(4px) !important;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="window-container">
+      <!-- Title Bar Custom -->
+      <div class="title-bar pywebview-drag-region">
+        <div class="title-left">
+          <span class="app-name">
+            <i class="bi bi-info-circle" style="padding-right: 5px"></i>
+            ROIP TIK Polda Bali
+          </span>
+          <span class="badge-friends">
+            <i class="bi bi-gear" style="color: #fff"></i>
+            Pengaturan Aplikasi
+          </span>
+        </div>
+        <div class="title-controls">
+          <span class="control-minimize" onclick="window.pywebview.api.minimize_window()" title="Minimize">
+            <i class="bi bi-dash"></i>
+          </span>
+          <span class="control-maximize" onclick="window.pywebview.api.maximize_window()" title="Maximize">
+            <i class="bi bi-arrows-angle-expand"></i>
+          </span>
+          <span class="control-close" onclick="goBack()" title="Close">
+            <i class="bi bi-x-lg"></i>
+          </span>
+        </div>
+      </div>
+
+      <div class="app-layout">
+        <!-- Sidebar Kiri Navigasi Tab Settings -->
+        <div class="settings-sidebar">
+          <button class="back-btn" onclick="goBack()">
+            <i class="bi bi-chevron-left"></i>
+            Back
+          </button>
+
+          <div class="settings-category-title">Settings</div>
+          <div class="settings-nav-list">
+            <button class="nav-item" onclick="switchSettingsTab('profile', this)">
+              <i class="bi bi-person"></i>
+              Profile
+            </button>
+            <button class="nav-item active" onclick="switchSettingsTab('audio', this)">
+              <i class="bi bi-headphones"></i>
+              Audio
+            </button>
+            <button class="nav-item" onclick="switchSettingsTab('voice', this)">
+              <i class="bi bi-mic"></i>
+              Voice
+            </button>
+            <button class="nav-item" onclick="switchSettingsTab('shortcuts', this)">
+              <i class="bi bi-keyboard"></i>
+              Shortcuts
+            </button>
+            <button class="nav-item" onclick="switchSettingsTab('identities', this)">
+              <i class="bi bi-shield-lock"></i>
+              Identities
+            </button>
+            <button class="nav-item" onclick="switchSettingsTab('notifications', this)">
+              <i class="bi bi-bell"></i>
+              Notifications
+            </button>
+          </div>
         </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-        <script>
-            let isInitializing = true; // Status penanda sedang memuat awal
+        <!-- Area Kanan Konten (Berdasarkan Tab Aktif) -->
+        <div class="settings-content-area">
+          <div id="tab-audio" class="settings-tab-pane active">
+            <div class="settings-header" style="display: flex; align-items: center; gap: 12px">
+              <h2>Audio dan Perangkat</h2>
+              <button
+                onclick="refreshAudioDevices()"
+                title="Refresh Perangkat Audio"
+                style="
+                  background: var(--bg-card);
+                  border: 1px solid var(--border-color);
+                  border-radius: 6px;
+                  padding: 4px 10px;
+                  color: var(--accent-blue);
+                  cursor: pointer;
+                  font-size: 12px;
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                  transition: 0.2s;
+                ">
+                <i class="bi bi-arrow-clockwise" id="refresh-icon"></i>
+                Refresh Audio
+              </button>
+              <span id="saveStatus" class="save-status">
+                <i class="bi bi-check2"></i>
+                Perubahan disimpan ke JSON
+              </span>
+            </div>
 
-            // Fungsi untuk berpindah antar Tab secara instan tanpa reload halaman
-            function switchSettingsTab(tabName, element) {
-                document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
-                document.querySelectorAll('.settings-tab-pane').forEach(pane => pane.classList.remove('active'));
+            <div class="settings-row">
+              <!-- Input Device (Microphone) Section -->
+              <div class="settings-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
+                  <label style="margin-bottom: 0">Input Device</label>
+                </div>
+                <div class="custom-select-wrapper" id="wrapper-inputDevice">
+                  <div class="custom-select" id="custom-inputDevice">
+                    <div class="custom-select-trigger">
+                      <span id="label-inputDevice">System default</span>
+                      <i class="bi bi-chevron-down"></i>
+                    </div>
+                    <div class="custom-options" id="options-inputDevice">
+                      <div
+                        class="custom-option selected"
+                        data-value="System default"
+                        onclick="selectCustomOption('inputDevice', 'System default', 'System default')">
+                        System default
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <input type="hidden" id="inputDevice" value="System default" onchange="saveSettingsData()" />
 
-                element.classList.add('active');
-                const targetTab = document.getElementById(`tab-${tabName}`);
-                if (targetTab) {
-                    targetTab.classList.add('active');
+                <!-- Tombol, Meteran, & Status ala Zoom -->
+                <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px">
+                  <button
+                    onclick="toggleMicTest()"
+                    id="btnMicTest"
+                    type="button"
+                    class="btn-test-audio"
+                    style="
+                      background: var(--bg-card);
+                      border: 1px solid var(--border-color);
+                      border-radius: 6px;
+                      padding: 6px 12px;
+                      color: var(--accent-green);
+                      cursor: pointer;
+                      font-size: 12px;
+                      display: flex;
+                      align-items: center;
+                      gap: 6px;
+                    ">
+                    <i class="bi bi-mic-fill" id="micTestIcon"></i>
+                    <span id="micTestText">Test microphone</span>
+                  </button>
+
+                  <!-- Kotak Level Meter -->
+                  <div class="audio-meter" style="display: flex; gap: 3px; flex-grow: 1" id="micMeter">
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                  </div>
+                </div>
+                <!-- Teks status kecil di bawah tombol ala Zoom -->
+                <div id="micStatusText" style="font-size: 11px; color: var(--text-secondary, #666); margin-top: 4px; min-height: 16px"></div>
+
+                <div class="slider-container" style="margin-top: 12px">
+                  <span>Microphone Volume</span>
+                  <span id="micVolText" style="color: var(--accent-blue); font-weight: 600">100%</span>
+                </div>
+                <input
+                  type="range"
+                  class="settings-slider"
+                  id="micVolume"
+                  min="0"
+                  max="100"
+                  value="100"
+                  oninput="updateSliderLabel('micVolume', 'micVolText', '%')"
+                  onchange="saveSettingsData()" />
+              </div>
+
+              <!-- Output Device (Speaker) Section -->
+              <div class="settings-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
+                  <label style="margin-bottom: 0">Output Device</label>
+                </div>
+                <div class="custom-select-wrapper" id="wrapper-outputDevice">
+                  <div class="custom-select" id="custom-outputDevice">
+                    <div class="custom-select-trigger">
+                      <span id="label-outputDevice">System default</span>
+                      <i class="bi bi-chevron-down"></i>
+                    </div>
+                    <div class="custom-options" id="options-outputDevice">
+                      <div
+                        class="custom-option selected"
+                        data-value="System default"
+                        onclick="selectCustomOption('outputDevice', 'System default', 'System default')">
+                        System default
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <input type="hidden" id="outputDevice" value="System default" onchange="saveSettingsData()" />
+
+                <!-- Tombol & Meteran Test Speaker (Gaya Zoom) -->
+                <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px">
+                  <button
+                    onclick="runSpeakerTest()"
+                    type="button"
+                    class="btn-test-audio"
+                    id="btnSpeakerTest"
+                    style="
+                      background: var(--bg-card);
+                      border: 1px solid var(--border-color);
+                      border-radius: 6px;
+                      padding: 6px 12px;
+                      color: var(--accent-blue);
+                      cursor: pointer;
+                      font-size: 12px;
+                      display: flex;
+                      align-items: center;
+                      gap: 6px;
+                    ">
+                    <i class="bi bi-volume-up-fill" id="speakerTestIcon"></i>
+                    <span id="speakerTestText">Test speaker</span>
+                  </button>
+                  <!-- Kotak Level Meter (8 blok indikator) -->
+                  <div class="audio-meter" style="display: flex; gap: 3px; flex-grow: 1" id="speakerMeter">
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; height: 16px; background: var(--border-color); border-radius: 2px"></div>
+                  </div>
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary, #666); margin-top: 4px; min-height: 16px"></div>
+
+                <div class="slider-container" style="margin-top: 12px">
+                  <span>Speaker Volume</span>
+                  <span id="speakerVolText" style="color: var(--accent-blue); font-weight: 600">100%</span>
+                </div>
+                <input
+                  type="range"
+                  class="settings-slider"
+                  id="speakerVolume"
+                  min="0"
+                  max="100"
+                  value="100"
+                  oninput="updateSliderLabel('speakerVolume', 'speakerVolText', '%')"
+                  onchange="saveSettingsData()" />
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 1: VOICE -->
+          <div id="tab-voice" class="settings-tab-pane">
+            <div class="settings-header" style="display: flex; align-items: center; gap: 12px">
+              <h2>Voice</h2>
+              <span id="saveStatus" class="save-status">
+                <i class="bi bi-check2"></i>
+                Perubahan disimpan ke JSON
+              </span>
+            </div>
+
+            <div class="settings-group" style="margin-top: 4px">
+              <label>Activation Mode</label>
+              <div class="section-subtitle">Choose how your microphone is activated.</div>
+
+              <div class="activation-grid">
+                <div class="activation-card active" id="mode-voice" onclick="setActivationMode('Voice Activation')">
+                  <i class="bi bi-soundwave"></i>
+                  <div class="card-title">Voice Activation</div>
+                  <div class="card-desc">Transmits while you talk. The mic opens when audio crosses the threshold.</div>
+                </div>
+                <div class="activation-card" id="mode-continuous" onclick="setActivationMode('Continuous')">
+                  <i class="bi bi-broadcast"></i>
+                  <div class="card-title">Continuous</div>
+                  <div class="card-desc">Always transmits. Best when you are alone in a quiet room.</div>
+                </div>
+                <div class="activation-card" id="mode-ptt" onclick="setActivationMode('Push to Talk')">
+                  <i class="bi bi-mic-fill"></i>
+                  <div class="card-title">Push to Talk</div>
+                  <div class="card-desc">Transmits only while a hotkey is held. Set the key under Shortcuts.</div>
+                </div>
+              </div>
+
+              <!-- Pengaturan Tambahan khusus Voice Activity -->
+              <div id="voiceActivitySettings" class="settings-group" style="margin-top: 16px; display: none">
+                <div class="slider-container">
+                  <span>Input Sensitivity (Threshold)</span>
+                  <span id="thresholdVolText" style="color: var(--accent-blue); font-weight: 600">-40 dB</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px">
+                  Geser slider ke kiri agar lebih sensitif (suara pelan langsung aktif), atau ke kanan agar lebih senyap.
+                </div>
+                <input
+                  type="range"
+                  class="settings-slider"
+                  id="voiceThreshold"
+                  min="-60"
+                  max="0"
+                  value="-40"
+                  oninput="updateSliderLabel('voiceThreshold', 'thresholdVolText', ' dB')"
+                  onchange="saveSettingsData()" />
+
+                <!-- Indikator Real-time untuk Voice Activity (Meteran Hijau/Merah) -->
+                <div style="margin-top: 12px">
+                  <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 4px">
+                    <span>Real-time Voice Indicator</span>
+                    <span id="thresholdStatusLabel" style="color: var(--accent-red)">Mic Terkunci (Senyap)</span>
+                  </div>
+                  <div class="audio-meter" style="display: flex; gap: 3px; height: 12px" id="voiceActivityMeter">
+                    <div class="meter-block" style="flex: 1; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; background: var(--border-color); border-radius: 2px"></div>
+                    <div class="meter-block" style="flex: 1; background: var(--border-color); border-radius: 2px"></div>
+                  </div>
+                  <!-- Panel Log Mikrofon Aktif -->
+                  <div
+                    style="
+                      margin-top: 12px;
+                      background: var(--bg-card);
+                      border: 1px solid var(--border-color);
+                      border-radius: 8px;
+                      padding: 10px 12px;
+                    ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px">
+                      <span style="font-size: 11px; font-weight: 650; color: var(--text-normal)">
+                        <i class="bi bi-info-circle" style="color: var(--accent-blue); margin-right: 4px"></i>
+                        Active Microphone Log
+                      </span>
+                      <span id="activeMicNameLabel" style="font-size: 11px; color: var(--accent-blue)">Memuat perangkat...</span>
+                    </div>
+                    <div
+                      id="micDebugLog"
+                      style="
+                        font-family: monospace;
+                        font-size: 11px;
+                        color: var(--text-muted);
+                        background: #0b1017;
+                        padding: 6px 8px;
+                        border-radius: 4px;
+                        max-height: 50px;
+                        overflow-y: auto;
+                      ">
+                      Sistem siap memantau input suara...
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pengaturan Hardware Serial / DTRS untuk Radio RIG Interfacing -->
+            <div class="settings-group" style="margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 20px">
+              <div style="display: flex; justify-content: space-between; align-items: center">
+                <div>
+                  <label>Radio RIG Hardware Interface (DTRS / COM Port)</label>
+                  <div class="section-subtitle" style="margin-bottom: 0; margin-top: 0px !important">
+                    Konfigurasi komunikasi serial USB-to-RS232 atau Port COM untuk pemicu PTT hardware
+                  </div>
+                </div>
+                <!-- Toggle Switch Hardware PTT Ditambahkan di Samping Kanan -->
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <span style="font-size: 11px; color: var(--text-muted)">Aktifkan Hardware PTT</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="enableHardwarePTT" onchange="saveSettingsData()" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="settings-row" style="margin-top: 12px; gap: 16px">
+                <!-- Pilihan Port COM -->
+                <div class="settings-group" style="flex: 1">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; height: 18px">
+                    <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 0">Serial Port (COM)</label>
+                    <span
+                      onclick="loadComPorts()"
+                      style="font-size: 11px; color: var(--accent-blue); cursor: pointer; display: flex; align-items: center; gap: 4px"
+                      title="Cari ulang port COM">
+                      <i class="bi bi-arrow-clockwise"></i>
+                      Refresh
+                    </span>
+                  </div>
+                  <div class="custom-select-wrapper" id="wrapper-serialPort">
+                    <div class="custom-select" id="custom-serialPort">
+                      <div class="custom-select-trigger">
+                        <span id="label-serialPort">Memindai Port...</span>
+                        <i class="bi bi-chevron-down"></i>
+                      </div>
+                      <div class="custom-options" id="options-serialPort"></div>
+                    </div>
+                  </div>
+                  <input type="hidden" id="serialPort" value="" onchange="saveSettingsData()" />
+                </div>
+
+                <!-- Pilihan Pin Kontrol (DTR / RTS) -->
+                <div class="settings-group" style="flex: 1">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; height: 18px">
+                    <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 0">PTT Control Pin (DTRS)</label>
+                  </div>
+                  <div class="custom-select-wrapper" id="wrapper-pttPin">
+                    <div class="custom-select" id="custom-pttPin">
+                      <div class="custom-select-trigger">
+                        <span id="label-pttPin">RTS</span>
+                        <i class="bi bi-chevron-down"></i>
+                      </div>
+                      <div class="custom-options" id="options-pttPin">
+                        <div class="custom-option selected" data-value="RTS" onclick="selectCustomOption('pttPin', 'RTS', 'RTS')">RTS</div>
+                        <div class="custom-option" data-value="DTR" onclick="selectCustomOption('pttPin', 'DTR', 'DTR')">DTR</div>
+                      </div>
+                    </div>
+                  </div>
+                  <input type="hidden" id="pttPin" value="RTS" onchange="saveSettingsData()" />
+                </div>
+
+                <!-- Baud Rate -->
+                <div class="settings-group" style="flex: 1">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; height: 18px">
+                    <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 0">Baud Rate</label>
+                  </div>
+                  <div class="custom-select-wrapper" id="wrapper-baudRate">
+                    <div class="custom-select" id="custom-baudRate">
+                      <div class="custom-select-trigger">
+                        <span id="label-baudRate">9600</span>
+                        <i class="bi bi-chevron-down"></i>
+                      </div>
+                      <div class="custom-options" id="options-baudRate">
+                        <div class="custom-option selected" data-value="9600" onclick="selectCustomOption('baudRate', '9600', '9600')">9600</div>
+                        <div class="custom-option" data-value="4800" onclick="selectCustomOption('baudRate', '4800', '4800')">4800</div>
+                        <div class="custom-option" data-value="19200" onclick="selectCustomOption('baudRate', '19200', '19200')">19200</div>
+                      </div>
+                    </div>
+                  </div>
+                  <input type="hidden" id="baudRate" value="9600" onchange="saveSettingsData()" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: SHORTCUTS -->
+          <div id="tab-shortcuts" class="settings-tab-pane">
+            <div class="settings-header" style="display: flex; align-items: center; gap: 12px">
+              <h2>Shortcuts</h2>
+              <span id="saveStatus" class="save-status">
+                <i class="bi bi-check2"></i>
+                Perubahan disimpan ke JSON
+              </span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-top: -14px">
+              Shortcuts marked
+              <strong style="color: var(--text-normal)">global</strong>
+              work even when the app is in the background. In-app shortcuts only fire while the window is focused.
+            </div>
+
+            <div style="font-size: 13px; font-weight: 700; color: var(--text-normal); margin-top: 10px">Voice - global</div>
+
+            <!-- Baris 1: Push to talk -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px">
+              <span style="font-size: 13px; font-weight: 500; color: var(--text-normal)">Push to talk</span>
+              <div style="display: flex; align-items: center; gap: 8px">
+                <div
+                  style="
+                    background-color: var(--bg-card);
+                    border: 1px solid var(--border-color);
+                    border-radius: 8px;
+                    padding: 10px 14px;
+                    width: 240px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    cursor: pointer;
+                  "
+                  onclick="startRecordShortcut(this, 'ptt')">
+                  <span id="shortcut-ptt" style="font-size: 13px; color: var(--text-normal)">SPACE</span>
+                  <i class="bi bi-pencil" style="font-size: 12px; color: var(--text-muted)"></i>
+                </div>
+                <button
+                  style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px"
+                  onclick="clearShortcut('shortcut-ptt')"
+                  title="Hapus Shortcut">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Baris 2: Toggle mute -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px">
+              <span style="font-size: 13px; font-weight: 500; color: var(--text-normal)">Toggle mute</span>
+              <div style="display: flex; align-items: center; gap: 8px">
+                <div
+                  style="
+                    background-color: var(--bg-card);
+                    border: 1px solid var(--border-color);
+                    border-radius: 8px;
+                    padding: 10px 14px;
+                    width: 240px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    cursor: pointer;
+                  "
+                  onclick="startRecordShortcut(this, 'mute')">
+                  <span id="shortcut-mute" style="font-size: 13px; color: var(--text-normal)">Ctrl+A</span>
+                  <i class="bi bi-pencil" style="font-size: 12px; color: var(--text-muted)"></i>
+                </div>
+                <button
+                  style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px"
+                  onclick="clearShortcut('shortcut-mute')"
+                  title="Hapus Shortcut">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Baris 3: Toggle deafen -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px">
+              <span style="font-size: 13px; font-weight: 500; color: var(--text-normal)">Toggle deafen</span>
+              <div style="display: flex; align-items: center; gap: 8px">
+                <div
+                  style="
+                    background-color: var(--bg-card);
+                    border: 1px solid var(--border-color);
+                    border-radius: 8px;
+                    padding: 10px 14px;
+                    width: 240px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    cursor: pointer;
+                  "
+                  onclick="startRecordShortcut(this, 'deafen')">
+                  <span id="shortcut-deafen" style="font-size: 13px; color: var(--text-normal)">Ctrl+N</span>
+                  <i class="bi bi-pencil" style="font-size: 12px; color: var(--text-muted)"></i>
+                </div>
+                <button
+                  style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px"
+                  onclick="clearShortcut('shortcut-deafen')"
+                  title="Hapus Shortcut">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB LAINNYA (Contoh Profile) -->
+          <div id="tab-profile" class="settings-tab-pane">
+            <div class="settings-header" style="display: flex; align-items: center; gap: 12px">
+              <h2>Profile</h2>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13px">Pengaturan profil operator dan informasi satker.</p>
+          </div>
+
+          <!-- TAB LAINNYA (Placeholder Umum) -->
+          <div id="tab-identities" class="settings-tab-pane">
+            <div class="settings-header" style="display: flex; align-items: center; gap: 12px">
+              <h2>Identities</h2>
+            </div>
+          </div>
+          <!-- TAB 5: NOTIFICATIONS -->
+          <div id="tab-notifications" class="settings-tab-pane">
+            <div class="settings-header" style="display: flex; align-items: center">
+              <h2>Notifikasi</h2>
+              <span id="saveStatus" class="save-status">
+                <i class="bi bi-check2"></i>
+                Perubahan disimpan ke JSON
+              </span>
+            </div>
+
+            <!-- Item 1: Suara Notifikasi -->
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding-bottom: 20px;
+                border-bottom: 1px solid var(--border-color);
+              ">
+              <div style="display: flex; flex-direction: column; gap: 4px; max-width: 75%">
+                <div style="font-size: 13px; font-weight: 650; color: var(--text-normal)">Suara notifikasi</div>
+                <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4">
+                  Putar suara saat peristiwa terjadi. Peristiwa individual dapat dikonfigurasi di bawah.
+                </div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="notifSound" onchange="saveSettingsData()" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <!-- Item 2: Notifikasi Sistem (Native) -->
+            <div
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding-bottom: 20px;
+                border-bottom: 1px solid var(--border-color);
+              ">
+              <div style="display: flex; flex-direction: column; gap: 4px; max-width: 75%">
+                <div style="font-size: 13px; font-weight: 650; color: var(--text-normal)">Notifikasi sistem</div>
+                <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4">
+                  Tampilkan notifikasi OS asli untuk pesan baru saat aplikasi berjalan di latar belakang.
+                </div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="nativeNotif" checked onchange="saveSettingsData()" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <!-- Item 3: Pesan Sambutan (Welcome Message) dengan Custom Select -->
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 5px">
+              <div style="font-size: 13px; font-weight: 650; color: var(--text-normal)">Pesan sambutan</div>
+              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4">
+                Tampilkan pesan sambutan server dalam jendela popup setelah terhubung.
+              </div>
+
+              <div class="custom-select-wrapper" id="wrapper-welcomeMsg" style="margin-top: 6px; max-width: 400px">
+                <div class="custom-select" id="custom-welcomeMsg">
+                  <div class="custom-select-trigger">
+                    <span id="label-welcomeMsg">Tampilkan sekali</span>
+                    <i class="bi bi-chevron-down"></i>
+                  </div>
+                  <div class="custom-options" id="options-welcomeMsg">
+                    <div
+                      class="custom-option selected"
+                      data-value="Show once"
+                      onclick="selectCustomOption('welcomeMsg', 'Show once', 'Tampilkan sekali')">
+                      Tampilkan sekali
+                    </div>
+                    <div class="custom-option" data-value="Always" onclick="selectCustomOption('welcomeMsg', 'Always', 'Selalu tampilkan')">
+                      Selalu tampilkan
+                    </div>
+                    <div class="custom-option" data-value="Never" onclick="selectCustomOption('welcomeMsg', 'Never', 'Jangan pernah')">
+                      Jangan pernah
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Input tersembunyi untuk menyimpan data ke backend JSON -->
+              <input type="hidden" id="welcomeMsg" value="Show once" onchange="saveSettingsData()" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+      let isInitializing = true; // Status penanda sedang memuat awal
+
+      // Fungsi untuk berpindah antar Tab secara instan tanpa reload halaman
+      function switchSettingsTab(tabName, element) {
+        document.querySelectorAll('.nav-item').forEach((btn) => btn.classList.remove('active'));
+        document.querySelectorAll('.settings-tab-pane').forEach((pane) => pane.classList.remove('active'));
+
+        element.classList.add('active');
+        const targetTab = document.getElementById(`tab-${tabName}`);
+        if (targetTab) {
+          targetTab.classList.add('active');
+        }
+
+        // Panggil monitor Python saat tab Voice aktif atau matikan jika pindah tab
+        if (window.pywebview && window.pywebview.api) {
+          if (tabName === 'voice') {
+            if (typeof window.pywebview.api.start_voice_activity_monitor === 'function') {
+              window.pywebview.api.start_voice_activity_monitor();
+            }
+          } else {
+            if (typeof window.pywebview.api.stop_voice_activity_monitor === 'function') {
+              window.pywebview.api.stop_voice_activity_monitor();
+            }
+          }
+        }
+      }
+
+      function clearShortcut(elementId) {
+        document.getElementById(elementId).innerText = 'None';
+        saveSettingsData();
+      }
+
+      // Variabel penyimpan state elemen dan handler yang sedang direkam
+      let activeShortcutSpan = null;
+      let currentKeyHandler = null;
+      let currentMouseDownHandler = null;
+
+      function startRecordShortcut(boxElement, type) {
+        const textSpan = boxElement.querySelector('span');
+
+        // Bersihkan listener sebelumnya jika ada yang aktif
+        if (currentKeyHandler) {
+          window.removeEventListener('keydown', currentKeyHandler);
+        }
+        if (currentMouseDownHandler) {
+          window.removeEventListener('mousedown', currentMouseDownHandler);
+        }
+
+        textSpan.innerText = 'Tekan tombol keyboard / klik mouse...';
+        activeShortcutSpan = textSpan;
+
+        // 1. Handler untuk Keyboard
+        currentKeyHandler = function (e) {
+          e.preventDefault();
+          let keyName = e.key.toUpperCase();
+
+          if (e.code === 'Space' || keyName === ' ' || keyName === '') {
+            keyName = 'SPACE';
+          }
+
+          if (['CONTROL', 'SHIFT', 'ALT'].includes(keyName)) {
+            let modifiers = [];
+            if (e.ctrlKey) modifiers.push('Ctrl');
+            if (e.shiftKey) modifiers.push('Shift');
+            if (e.altKey) modifiers.push('Alt');
+            textSpan.innerText = modifiers.join('+') + '+';
+            return;
+          }
+
+          let keys = [];
+          if (e.ctrlKey) keys.push('Ctrl');
+          if (e.shiftKey) keys.push('Shift');
+          if (e.altKey) keys.push('Alt');
+
+          keys.push(keyName);
+
+          finishRecording(keys.join('+'));
+        };
+
+        // 2. Handler untuk Mouse (Klik Tombol Mouse)
+        currentMouseDownHandler = function (e) {
+          if (e.button === 0 && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+            return;
+          }
+
+          e.preventDefault();
+          let keys = [];
+          if (e.ctrlKey) keys.push('Ctrl');
+          if (e.shiftKey) keys.push('Shift');
+          if (e.altKey) keys.push('Alt');
+
+          let mouseBtn = 'Mouse 1'; // Klik Kiri
+          if (e.button === 1) mouseBtn = 'Mouse 3 (Middle)';
+          else if (e.button === 2) mouseBtn = 'Mouse 2 (Right)';
+          else if (e.button === 3) mouseBtn = 'Mouse 4 (Back)';
+          else if (e.button === 4) mouseBtn = 'Mouse 5 (Forward)';
+
+          keys.push(mouseBtn);
+
+          finishRecording(keys.join('+'));
+        };
+
+        window.addEventListener('keydown', currentKeyHandler);
+        window.addEventListener('mousedown', currentMouseDownHandler);
+      }
+
+      // Fungsi pembantu untuk mengakhiri perekaman dan menyimpan
+      function finishRecording(shortcutString) {
+        if (activeShortcutSpan) {
+          activeShortcutSpan.innerText = shortcutString;
+        }
+
+        if (currentKeyHandler) {
+          window.removeEventListener('keydown', currentKeyHandler);
+          currentKeyHandler = null;
+        }
+        if (currentMouseDownHandler) {
+          window.removeEventListener('mousedown', currentMouseDownHandler);
+          currentMouseDownHandler = null;
+        }
+
+        activeShortcutSpan = null;
+
+        saveSettingsData();
+      }
+
+      function updateSliderLabel(sliderId, textId, unit) {
+        const slider = document.getElementById(sliderId);
+        const text = document.getElementById(textId);
+        if (slider && text) {
+          text.innerText = slider.value + unit;
+
+          // Kirim perubahan nilai slider ke backend Python secara real-time
+          if (window.pywebview) {
+            const micVol = document.getElementById('micVolume').value;
+            const speakerVol = document.getElementById('speakerVolume').value;
+            window.pywebview.api.save_audio_volumes(micVol, speakerVol);
+          }
+        }
+      }
+
+      let currentActivationMode = 'Voice Activation';
+      function setActivationMode(modeName) {
+        currentActivationMode = modeName;
+        document.querySelectorAll('.activation-card').forEach((card) => card.classList.remove('active'));
+
+        // Sembunyikan atau tampilkan pengaturan khusus Voice Activity
+        const vaSettings = document.getElementById('voiceActivitySettings');
+        if (vaSettings) {
+          vaSettings.style.display = modeName === 'Voice Activation' ? 'flex' : 'none';
+        }
+
+        if (modeName === 'Voice Activation') document.getElementById('mode-voice').classList.add('active');
+        if (modeName === 'Continuous') document.getElementById('mode-continuous').classList.add('active');
+        if (modeName === 'Push to Talk') document.getElementById('mode-ptt').classList.add('active');
+
+        saveSettingsData();
+      }
+
+      function updateVoiceActivityMonitorUI(micName, dbValue, isPassing) {
+        // Update nama mic di panel log aktif
+        const micLabel = document.getElementById('activeMicNameLabel');
+        if (micLabel) micLabel.innerText = micName;
+
+        // Update teks debug log
+        const logBox = document.getElementById('micDebugLog');
+        if (logBox) {
+          logBox.innerHTML = `Active Input: [${micName}] | Level: ${dbValue} dB | Status: ${isPassing ? 'PASS (Transmitting)' : 'LOCKED (Silent)'}`;
+        }
+
+        // Panggil fungsi penggerak bar meteran
+        updateVoiceActivityIndicator(dbValue, isPassing);
+      }
+
+      function updateVoiceActivityIndicator(dbValue, isPassing) {
+        const meterContainer = document.getElementById('voiceActivityMeter');
+        const statusLabel = document.getElementById('thresholdStatusLabel');
+        if (!meterContainer) return;
+
+        const blocks = meterContainer.querySelectorAll('.meter-block');
+
+        // Ubah status teks
+        if (isPassing) {
+          if (statusLabel) {
+            statusLabel.innerText = 'Transmisi Aktif (Suara Terdeteksi)';
+            statusLabel.style.color = 'var(--accent-green)';
+          }
+        } else {
+          if (statusLabel) {
+            statusLabel.innerText = 'Mic Terkunci (Senyap)';
+            statusLabel.style.color = 'var(--accent-red)';
+          }
+        }
+
+        // Perbaikan rumus normalisasi desibel dari rentang -60 s.d 0 ke 0.0 s.d 1.0
+        let normalizedLevel = Math.min(Math.max((dbValue + 60) / (0 - -60), 0), 1);
+        let activeBlocks = Math.round(normalizedLevel * blocks.length);
+
+        blocks.forEach((block, idx) => {
+          if (idx < activeBlocks) {
+            block.style.background = isPassing ? (idx > 5 ? '#e74c3c' : idx > 3 ? '#f1c40f' : '#2ecc71') : 'var(--border-color)';
+          } else {
+            block.style.background = 'var(--border-color)';
+          }
+        });
+      }
+
+      // Fungsi Auto-Save ke file JSON melalui Python Backend (pywebview)
+      function saveSettingsData() {
+        if (isInitializing) return; // Cegah simpan otomatis saat awal buka aplikasi
+
+        const settingsPayload = {
+          inputDevice: document.getElementById('inputDevice').value,
+          outputDevice: document.getElementById('outputDevice').value,
+          micVolume: document.getElementById('micVolume').value,
+          speakerVolume: document.getElementById('speakerVolume').value,
+          activationMode: currentActivationMode,
+          voiceThreshold: document.getElementById('voiceThreshold') ? document.getElementById('voiceThreshold').value : '-40',
+          hardwareInterface: {
+            enableHardwarePTT: document.getElementById('enableHardwarePTT').checked,
+            serialPort: document.getElementById('serialPort').value,
+            pttPin: document.getElementById('pttPin').value,
+            baudRate: document.getElementById('baudRate').value,
+          },
+          shortcuts: {
+            pushToTalk: document.getElementById('shortcut-ptt').innerText,
+            toggleMute: document.getElementById('shortcut-mute').innerText,
+            toggleDeafen: document.getElementById('shortcut-deafen').innerText,
+          },
+          notifications: {
+            sound: document.getElementById('notifSound').checked,
+            native: document.getElementById('nativeNotif').checked,
+            welcomeMessage: document.getElementById('welcomeMsg').value,
+          },
+        };
+
+        if (window.pywebview && window.pywebview.api) {
+          window.pywebview.api.save_settings_to_json(settingsPayload).then((response) => {
+            showSaveIndicator();
+          });
+        } else {
+          console.log('Simpan ke JSON:', settingsPayload);
+          showSaveIndicator();
+        }
+      }
+
+      function showSaveIndicator() {
+        const indicators = document.querySelectorAll('#saveStatus');
+
+        indicators.forEach((indicator) => {
+          const tabPane = indicator.closest('.settings-tab-pane');
+          if (tabPane && tabPane.classList.contains('active')) {
+            indicator.classList.add('show');
+            setTimeout(() => {
+              indicator.classList.remove('show');
+            }, 2000);
+          }
+        });
+      }
+
+      function goBack() {
+        if (typeof socket !== 'undefined' && socket) {
+          socket.disconnect();
+        }
+
+        setTimeout(() => {
+          if (window.pywebview && window.pywebview.api && window.pywebview.api.go_to_index) {
+            window.pywebview.api.go_to_index();
+          } else {
+            window.location.href = 'index.html';
+          }
+        }, 150);
+      }
+
+      // Mengatur interaksi buka/tutup custom select saat diklik
+      document.addEventListener('click', (e) => {
+        document.querySelectorAll('.custom-select').forEach((select) => {
+          if (!select.contains(e.target)) {
+            select.classList.remove('open');
+          }
+        });
+      });
+
+      document.querySelectorAll('.custom-select-trigger').forEach((trigger) => {
+        trigger.addEventListener('click', function (e) {
+          e.stopPropagation();
+          const parentSelect = this.closest('.custom-select');
+          document.querySelectorAll('.custom-select').forEach((s) => {
+            if (s !== parentSelect) s.classList.remove('open');
+          });
+          parentSelect.classList.toggle('open');
+        });
+      });
+
+      function selectCustomOption(type, value, displayName) {
+        document.getElementById(`label-${type}`).textContent = displayName;
+        document.getElementById(type).value = value;
+
+        const optionsContainer = document.getElementById(`options-${type}`);
+        optionsContainer.querySelectorAll('.custom-option').forEach((opt) => {
+          opt.classList.remove('selected');
+          if (opt.getAttribute('data-value') === value) {
+            opt.classList.add('selected');
+          }
+        });
+
+        document.getElementById(`custom-${type}`).classList.remove('open');
+        saveSettingsData();
+      }
+
+      function refreshAudioDevices() {
+        const icon = document.getElementById('refresh-icon');
+        if (icon) {
+          icon.style.transition = 'transform 0.5s ease';
+          icon.style.transform = 'rotate(360deg)';
+          setTimeout(() => {
+            icon.style.transform = 'rotate(0deg)';
+          }, 500);
+        }
+        loadAudioDevices();
+      }
+
+      function loadAudioDevices() {
+        if (window.pywebview && window.pywebview.api) {
+          window.pywebview.api.get_audio_devices().then((res) => {
+            if (!res.success) return;
+
+            const populateCustomOptions = (type, devices) => {
+              const optionsContainer = document.getElementById(`options-${type}`);
+              optionsContainer.innerHTML = `<div class="custom-option selected" data-value="System default" onclick="selectCustomOption('${type}', 'System default', 'System default')">System default</div>`;
+
+              devices.forEach((device) => {
+                let div = document.createElement('div');
+                div.className = 'custom-option';
+                div.setAttribute('data-value', device.name);
+                div.textContent = device.name;
+                div.setAttribute('onclick', `selectCustomOption('${type}', ${JSON.stringify(device.name)}, ${JSON.stringify(device.name)})`);
+                optionsContainer.appendChild(div);
+              });
+            };
+
+            populateCustomOptions('inputDevice', res.inputs);
+            populateCustomOptions('outputDevice', res.outputs);
+
+            loadSettingsData();
+          });
+        }
+      }
+
+      async function loadComPorts() {
+        const optionsContainer = document.getElementById('options-serialPort');
+        const hiddenInput = document.getElementById('serialPort');
+        const labelSpan = document.getElementById('label-serialPort');
+
+        if (window.pywebview && window.pywebview.api.get_available_com_ports) {
+          try {
+            const res = await window.pywebview.api.get_available_com_ports();
+            optionsContainer.innerHTML = '';
+
+            if (res.success && res.ports && res.ports.length > 0) {
+              res.ports.forEach((p, index) => {
+                const isSelected = index === 0 ? 'selected' : '';
+                const displayName = `${p.device} (${p.description})`;
+
+                if (
+                  index === 0 &&
+                  (!hiddenInput.value || hiddenInput.value === 'Pilih Port COM' || hiddenInput.value === 'Tidak ada COM yang terdeteksi')
+                ) {
+                  hiddenInput.value = p.device;
+                  labelSpan.textContent = displayName;
                 }
+
+                const div = document.createElement('div');
+                div.className = `custom-option ${isSelected}`;
+                div.setAttribute('data-value', p.device);
+                div.textContent = displayName;
+                div.setAttribute('onclick', `selectCustomOption('serialPort', '${p.device}', '${displayName}')`);
+
+                optionsContainer.appendChild(div);
+              });
+            } else {
+              labelSpan.textContent = 'Tidak ada COM yang terdeteksi';
+              hiddenInput.value = '';
+
+              const div = document.createElement('div');
+              div.className = 'custom-option';
+              div.style.color = 'var(--text-muted)';
+              div.style.cursor = 'default';
+              div.textContent = 'Tidak ada COM yang terdeteksi';
+              optionsContainer.appendChild(div);
+            }
+          } catch (e) {
+            console.error('Gagal memindai port COM:', e);
+            labelSpan.textContent = 'Gagal memindai port COM';
+          }
+        }
+      }
+
+      function loadSettingsData() {
+        if (window.pywebview && window.pywebview.api) {
+          isInitializing = true;
+
+          window.pywebview.api.load_settings_from_json().then((data) => {
+            if (!data) {
+              isInitializing = false;
+              return;
             }
 
-            function clearShortcut(elementId) {
-                document.getElementById(elementId).innerText = "None";
-                saveSettingsData();
+            if (data.inputDevice) {
+              document.getElementById('inputDevice').value = data.inputDevice;
+              document.getElementById('label-inputDevice').textContent = data.inputDevice;
+            }
+            if (data.outputDevice) {
+              document.getElementById('outputDevice').value = data.outputDevice;
+              document.getElementById('label-outputDevice').textContent = data.outputDevice;
+            }
+            if (data.micVolume) {
+              document.getElementById('micVolume').value = data.micVolume;
+              updateSliderLabel('micVolume', 'micVolText', '%');
+            }
+            if (data.speakerVolume) {
+              document.getElementById('speakerVolume').value = data.speakerVolume;
+              updateSliderLabel('speakerVolume', 'speakerVolText', '%');
+            }
+            if (data.activationMode) {
+              setActivationMode(data.activationMode);
+            }
+            if (data.voiceThreshold) {
+              const slider = document.getElementById('voiceThreshold');
+              if (slider) {
+                slider.value = data.voiceThreshold;
+                updateSliderLabel('voiceThreshold', 'thresholdVolText', ' dB');
+              }
+            }
+            if (data.hardwareInterface) {
+              if (data.hardwareInterface.enableHardwarePTT !== undefined) {
+                document.getElementById('enableHardwarePTT').checked = data.hardwareInterface.enableHardwarePTT;
+              }
+              if (data.hardwareInterface.serialPort) {
+                document.getElementById('serialPort').value = data.hardwareInterface.serialPort;
+                document.getElementById('label-serialPort').textContent = data.hardwareInterface.serialPort;
+              }
+              if (data.hardwareInterface.pttPin) {
+                document.getElementById('pttPin').value = data.hardwareInterface.pttPin;
+                document.getElementById('label-pttPin').textContent = data.hardwareInterface.pttPin;
+              }
+              if (data.hardwareInterface.baudRate) {
+                document.getElementById('baudRate').value = data.hardwareInterface.baudRate;
+                document.getElementById('label-baudRate').textContent = data.hardwareInterface.baudRate;
+              }
+            }
+            if (data.shortcuts) {
+              if (data.shortcuts.pushToTalk) document.getElementById('shortcut-ptt').innerText = data.shortcuts.pushToTalk;
+              if (data.shortcuts.toggleMute) document.getElementById('shortcut-mute').innerText = data.shortcuts.toggleMute;
+              if (data.shortcuts.toggleDeafen) document.getElementById('shortcut-deafen').innerText = data.shortcuts.toggleDeafen;
+            }
+            if (data.notifications) {
+              if (data.notifications.sound !== undefined) {
+                document.getElementById('notifSound').checked = data.notifications.sound;
+              }
+              if (data.notifications.native !== undefined) {
+                document.getElementById('nativeNotif').checked = data.notifications.native;
+              }
+              if (data.notifications.welcomeMessage) {
+                const val = data.notifications.welcomeMessage;
+                document.getElementById('welcomeMsg').value = val;
+                let labelText = 'Tampilkan sekali';
+                if (val === 'Always') labelText = 'Selalu tampilkan';
+                if (val === 'Never') labelText = 'Jangan pernah';
+                document.getElementById('label-welcomeMsg').textContent = labelText;
+              }
             }
 
-            // Variabel penyimpan state elemen dan handler yang sedang direkam
-            let activeShortcutSpan = null;
-            let currentKeyHandler = null;
-            let currentMouseDownHandler = null;
+            isInitializing = false;
+          });
+        }
+      }
 
-            function startRecordShortcut(boxElement, type) {
-                const textSpan = boxElement.querySelector('span');
+      window.addEventListener('pywebviewready', function () {
+        if (window.pywebview && window.pywebview.api.apply_window_state) {
+          window.pywebview.api.apply_window_state();
+        }
+        loadAudioDevices();
+        loadComPorts();
+      });
 
-                // Bersihkan listener sebelumnya jika ada yang aktif
-                if (currentKeyHandler) {
-                    window.removeEventListener('keydown', currentKeyHandler);
-                }
-                if (currentMouseDownHandler) {
-                    window.removeEventListener('mousedown', currentMouseDownHandler);
-                }
+      document.addEventListener('DOMContentLoaded', () => {
+        const titleBar = document.querySelector('.title-bar');
 
-                textSpan.innerText = "Tekan tombol keyboard / klik mouse...";
-                activeShortcutSpan = textSpan;
+        if (titleBar) {
+          let isMouseDown = false;
+          let startX = 0;
+          let startY = 0;
 
-                // 1. Handler untuk Keyboard
-                currentKeyHandler = function (e) {
-                    e.preventDefault();
-                    let keyName = e.key.toUpperCase();
-
-                    if (e.code === "Space" || keyName === " " || keyName === "") {
-                        keyName = "SPACE";
-                    }
-
-                    if (["CONTROL", "SHIFT", "ALT"].includes(keyName)) {
-                        let modifiers = [];
-                        if (e.ctrlKey) modifiers.push("Ctrl");
-                        if (e.shiftKey) modifiers.push("Shift");
-                        if (e.altKey) modifiers.push("Alt");
-                        textSpan.innerText = modifiers.join("+") + "+";
-                        return;
-                    }
-
-                    let keys = [];
-                    if (e.ctrlKey) keys.push("Ctrl");
-                    if (e.shiftKey) keys.push("Shift");
-                    if (e.altKey) keys.push("Alt");
-
-                    keys.push(keyName);
-
-                    finishRecording(keys.join("+"));
-                };
-
-                // 2. Handler untuk Mouse (Klik Tombol Mouse)
-                currentMouseDownHandler = function (e) {
-                    if (e.button === 0 && !e.ctrlKey && !e.shiftKey && !e.altKey) {
-                        return;
-                    }
-
-                    e.preventDefault();
-                    let keys = [];
-                    if (e.ctrlKey) keys.push("Ctrl");
-                    if (e.shiftKey) keys.push("Shift");
-                    if (e.altKey) keys.push("Alt");
-
-                    let mouseBtn = "Mouse 1"; // Klik Kiri
-                    if (e.button === 1) mouseBtn = "Mouse 3 (Middle)";
-                    else if (e.button === 2) mouseBtn = "Mouse 2 (Right)";
-                    else if (e.button === 3) mouseBtn = "Mouse 4 (Back)";
-                    else if (e.button === 4) mouseBtn = "Mouse 5 (Forward)";
-
-                    keys.push(mouseBtn);
-
-                    finishRecording(keys.join("+"));
-                };
-
-                window.addEventListener('keydown', currentKeyHandler);
-                window.addEventListener('mousedown', currentMouseDownHandler);
+          titleBar.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.title-controls') || e.target.closest('.connection-badge')) {
+              return;
             }
+            isMouseDown = true;
+            startX = e.clientX;
+            startY = e.clientY;
+          });
 
-            // Fungsi pembantu untuk mengakhiri perekaman dan menyimpan
-            function finishRecording(shortcutString) {
-                if (activeShortcutSpan) {
-                    activeShortcutSpan.innerText = shortcutString;
-                }
+          window.addEventListener('mousemove', (e) => {
+            if (!isMouseDown) return;
 
-                if (currentKeyHandler) {
-                    window.removeEventListener('keydown', currentKeyHandler);
-                    currentKeyHandler = null;
-                }
-                if (currentMouseDownHandler) {
-                    window.removeEventListener('mousedown', currentMouseDownHandler);
-                    currentMouseDownHandler = null;
-                }
+            // Hitung jarak pergerakan mouse (geseran / drag)
+            const moveX = Math.abs(e.clientX - startX);
+            const moveY = Math.abs(e.clientY - startY);
 
-                activeShortcutSpan = null;
+            // Jika mouse bergeser lebih dari 5 piksel, anggap ini sebagai aksi DRAG
+            if (moveX > 5 || moveY > 5) {
+              isMouseDown = false; // Matikan agar tidak terpanggil terus menerus
 
-                saveSettingsData();
+              if (window.pywebview && window.pywebview.api && window.pywebview.api.reset_window_size) {
+                window.pywebview.api.reset_window_size();
+              }
             }
+          });
 
-            function updateSliderLabel(sliderId, textId, unit) {
-                const slider = document.getElementById(sliderId);
-                const text = document.getElementById(textId);
-                if (slider && text) {
-                    text.innerText = slider.value + unit;
+          window.addEventListener('mouseup', () => {
+            isMouseDown = false;
+          });
+        }
+      });
 
-                    // Kirim perubahan nilai slider ke backend Python secara real-time
-                    if (window.pywebview) {
-                        const micVol = document.getElementById('micVolume').value;
-                        const speakerVol = document.getElementById('speakerVolume').value;
-                        window.pywebview.api.save_audio_volumes(micVol, speakerVol);
-                    }
-                }
-            }
+      let speakerMeterInterval = null;
+      let isTestingSpeaker = false;
+      let speakerTestTimeout = null;
 
-            let currentActivationMode = "Voice Activation";
-            function setActivationMode(modeName) {
-                currentActivationMode = modeName;
-                document.querySelectorAll('.activation-card').forEach(card => card.classList.remove('active'));
+      function runSpeakerTest() {
+        const selectedOutput = document.getElementById('outputDevice').value;
+        const btnText = document.getElementById('speakerTestText');
 
-                if (modeName === 'Voice Activation') document.getElementById('mode-voice').classList.add('active');
-                if (modeName === 'Continuous') document.getElementById('mode-continuous').classList.add('active');
-                if (modeName === 'Push to Talk') document.getElementById('mode-ptt').classList.add('active');
+        // Jika sedang tes, tombol berfungsi sebagai Stop Manual
+        if (isTestingSpeaker) {
+          stopSpeakerTest();
+          return;
+        }
 
-                saveSettingsData();
-            }
+        // BERSIHKAN SEMUA TIMER/INTERVAL LAMA (Mencegah bentrok dengan tes sebelumnya)
+        if (speakerTestTimeout) {
+          clearTimeout(speakerTestTimeout);
+          speakerTestTimeout = null;
+        }
+        if (speakerMeterInterval) {
+          clearInterval(speakerMeterInterval);
+          speakerMeterInterval = null;
+        }
 
-            // Fungsi Auto-Save ke file JSON melalui Python Backend (pywebview)
-            function saveSettingsData() {
-                if (isInitializing) return; // Cegah simpan otomatis saat awal buka aplikasi
+        // Ubah status dan teks tombol menjadi Stop Test
+        isTestingSpeaker = true;
+        if (btnText) btnText.innerText = 'Stop Test';
 
-                const settingsPayload = {
-                    inputDevice: document.getElementById('inputDevice').value,
-                    outputDevice: document.getElementById('outputDevice').value,
-                    micVolume: document.getElementById('micVolume').value,
-                    speakerVolume: document.getElementById('speakerVolume').value,
-                    activationMode: currentActivationMode,
-                    hardwareInterface: {
-                        enableHardwarePTT: document.getElementById('enableHardwarePTT').checked,
-                        serialPort: document.getElementById('serialPort').value,
-                        pttPin: document.getElementById('pttPin').value,
-                        baudRate: document.getElementById('baudRate').value
-                    },
-                    shortcuts: {
-                        pushToTalk: document.getElementById('shortcut-ptt').innerText,
-                        toggleMute: document.getElementById('shortcut-mute').innerText,
-                        toggleDeafen: document.getElementById('shortcut-deafen').innerText
-                    },
-                    notifications: {
-                        sound: document.getElementById('notifSound').checked,
-                        native: document.getElementById('nativeNotif').checked,
-                        welcomeMessage: document.getElementById('welcomeMsg').value
-                    }
-                };
+        // Jalankan animasi meteran speaker selama 11 detik (11000 ms)
+        animateMeter('speakerMeter', 12000);
 
-                if (window.pywebview && window.pywebview.api) {
-                    window.pywebview.api.save_settings_to_json(settingsPayload).then(response => {
-                        showSaveIndicator();
-                    });
-                } else {
-                    console.log("Simpan ke JSON:", settingsPayload);
-                    showSaveIndicator();
-                }
-            }
-
-            function showSaveIndicator() {
-                const indicators = document.querySelectorAll('#saveStatus');
-
-                indicators.forEach(indicator => {
-                    const tabPane = indicator.closest('.settings-tab-pane');
-                    if (tabPane && tabPane.classList.contains('active')) {
-                        indicator.classList.add('show');
-                        setTimeout(() => {
-                            indicator.classList.remove('show');
-                        }, 2000);
-                    }
-                });
-            }
-
-            function goBack() {
-                if (typeof socket !== 'undefined' && socket) {
-                    socket.disconnect();
-                }
-
-                setTimeout(() => {
-                    if (window.pywebview && window.pywebview.api && window.pywebview.api.go_to_index) {
-                        window.pywebview.api.go_to_index();
-                    } else {
-                        window.location.href = 'index.html';
-                    }
-                }, 150);
-            }
-
-            // Mengatur interaksi buka/tutup custom select saat diklik
-            document.addEventListener("click", (e) => {
-                document.querySelectorAll('.custom-select').forEach(select => {
-                    if (!select.contains(e.target)) {
-                        select.classList.remove('open');
-                    }
-                });
+        if (window.pywebview && window.pywebview.api.test_speaker) {
+          window.pywebview.api
+            .test_speaker(selectedOutput)
+            .then((res) => {
+              console.log(res.message);
+              resetSpeakerTestUI();
+            })
+            .catch((err) => {
+              console.error(err);
+              resetSpeakerTestUI();
             });
+        }
 
-            document.querySelectorAll('.custom-select-trigger').forEach(trigger => {
-                trigger.addEventListener('click', function (e) {
-                    e.stopPropagation();
-                    const parentSelect = this.closest('.custom-select');
-                    document.querySelectorAll('.custom-select').forEach(s => {
-                        if (s !== parentSelect) s.classList.remove('open');
-                    });
-                    parentSelect.classList.toggle('open');
-                });
-            });
+        // Auto-reset UI setelah 11 detik jika selesai secara normal
+        speakerTestTimeout = setTimeout(() => {
+          resetSpeakerTestUI();
+        }, 12000);
+      }
 
-            function selectCustomOption(type, value, displayName) {
-                document.getElementById(`label-${type}`).textContent = displayName;
-                document.getElementById(type).value = value;
+      function stopSpeakerTest() {
+        // 1. Panggil fungsi stop di backend Python agar suara langsung berhenti
+        if (window.pywebview && window.pywebview.api.stop_speaker_test) {
+          window.pywebview.api.stop_speaker_test().then((res) => {
+            console.log(res.message);
+          });
+        }
 
-                const optionsContainer = document.getElementById(`options-${type}`);
-                optionsContainer.querySelectorAll('.custom-option').forEach(opt => {
-                    opt.classList.remove('selected');
-                    if (opt.getAttribute('data-value') === value) {
-                        opt.classList.add('selected');
-                    }
-                });
+        // 2. Batalkan timeout otomatis durasi 11 detik
+        if (speakerTestTimeout) {
+          clearTimeout(speakerTestTimeout);
+          speakerTestTimeout = null;
+        }
 
-                document.getElementById(`custom-${type}`).classList.remove('open');
-                saveSettingsData();
+        // 3. Langsung reset UI, teks tombol, dan matikan meteran ke 0
+        resetSpeakerTestUI();
+      }
+
+      function resetSpeakerTestUI() {
+        isTestingSpeaker = false;
+        const btnText = document.getElementById('speakerTestText');
+        if (btnText) btnText.innerText = 'Test speaker'; // Kembalikan teks tombol semula
+
+        // Paksa hentikan interval meteran dan set balok warna ke 0 (default)
+        animateMeter('speakerMeter', 0);
+      }
+
+      // Fungsi Animasi Indikator Meter
+      function animateMeter(meterId, durationMs) {
+        const meterContainer = document.getElementById(meterId);
+        if (!meterContainer) return;
+        const blocks = meterContainer.querySelectorAll('.meter-block');
+
+        // Selalu bersihkan interval yang sedang aktif sebelumnya
+        if (speakerMeterInterval) {
+          clearInterval(speakerMeterInterval);
+          speakerMeterInterval = null;
+        }
+
+        // Jika durasi 0 (perintah reset/stop), langsung matikan semua balok ke warna default
+        if (durationMs <= 0) {
+          blocks.forEach((block) => (block.style.background = 'var(--border-color)'));
+          return;
+        }
+
+        // Jalankan interval animasi baru
+        speakerMeterInterval = setInterval(() => {
+          blocks.forEach((block, idx) => {
+            if (Math.random() > 0.4) {
+              block.style.background = idx > 5 ? '#e74c3c' : idx > 3 ? '#f1c40f' : '#2ecc71';
+            } else {
+              block.style.background = 'var(--border-color)';
             }
+          });
+        }, 100);
 
-            function refreshAudioDevices() {
-                const icon = document.getElementById('refresh-icon');
-                if (icon) {
-                    icon.style.transition = "transform 0.5s ease";
-                    icon.style.transform = "rotate(360deg)";
-                    setTimeout(() => {
-                        icon.style.transform = "rotate(0deg)";
-                    }, 500);
-                }
-                loadAudioDevices();
+        // Jangan gunakan setTimeout lokal di sini jika sudah dikendalikan oleh speakerTestTimeout di runSpeakerTest
+      }
+
+      let micTestTimeout = null;
+      let playbackTimeout = null;
+
+      function toggleMicTest() {
+        const btnText = document.getElementById('micTestText');
+        const statusText = document.getElementById('micStatusText');
+        const selectedInput = document.getElementById('inputDevice').value;
+        const selectedOutput = document.getElementById('outputDevice').value;
+
+        if (btnText.innerText === 'Test microphone') {
+          // Mulai Perekaman
+          btnText.innerText = 'Stop recording';
+          statusText.innerText = 'Recording... (Maksimal 10 detik)';
+
+          if (window.pywebview) {
+            window.pywebview.api.start_mic_test_record(selectedInput);
+          }
+
+          // Timer pengaman 15 detik di sisi frontend
+          micTestTimeout = setTimeout(() => {
+            if (btnText.innerText === 'Stop recording') {
+              autoTransitionToPlayback();
             }
+          }, 10000);
+        } else if (btnText.innerText === 'Stop recording') {
+          // Jika user menghentikan rekaman secara manual sebelum 15 detik
+          if (micTestTimeout) clearTimeout(micTestTimeout);
+          autoTransitionToPlayback();
+        } else if (btnText.innerText === 'Stop playing') {
+          // Jika user ingin membatalkan pemutaran di tengah jalan
+          if (window.pywebview) {
+            window.pywebview.api.stop_audio_test();
+          }
+          resetMicTestUI();
+        }
+      }
 
-            function loadAudioDevices() {
-                if (window.pywebview && window.pywebview.api) {
-                    window.pywebview.api.get_audio_devices().then(res => {
-                        if (!res.success) return;
+      function autoTransitionToPlayback() {
+        if (micTestTimeout) clearTimeout(micTestTimeout);
+        if (playbackTimeout) clearTimeout(playbackTimeout);
 
-                        const populateCustomOptions = (type, devices) => {
-                            const optionsContainer = document.getElementById(`options-${type}`);
-                            optionsContainer.innerHTML = `<div class="custom-option selected" data-value="System default" onclick="selectCustomOption('${type}', 'System default', 'System default')">System default</div>`;
+        const btnText = document.getElementById('micTestText');
+        const statusText = document.getElementById('micStatusText');
+        const selectedOutput = document.getElementById('outputDevice').value;
 
-                            devices.forEach(device => {
-                                let div = document.createElement('div');
-                                div.className = 'custom-option';
-                                div.setAttribute('data-value', device.name);
-                                div.textContent = device.name;
-                                div.setAttribute('onclick', `selectCustomOption('${type}', ${JSON.stringify(device.name)}, ${JSON.stringify(device.name)})`);
-                                optionsContainer.appendChild(div);
-                            });
-                        };
+        btnText.innerText = 'Stop playing';
+        statusText.innerText = 'Playing recorded audio...';
+        updateMicMeter(0);
 
-                        populateCustomOptions('inputDevice', res.inputs);
-                        populateCustomOptions('outputDevice', res.outputs);
+        if (window.pywebview) {
+          window.pywebview.api.stop_mic_test_and_playback(selectedOutput);
+        }
 
-                        loadSettingsData();
-                    });
-                }
+        // Otomatis kembali ke "Test microphone" setelah 10 detik masa pemutaran
+        playbackTimeout = setTimeout(() => {
+          if (btnText.innerText === 'Stop playing') {
+            if (window.pywebview && window.pywebview.api.stop_audio_test) {
+              window.pywebview.api.stop_audio_test();
             }
+            resetMicTestUI();
+          }
+        }, 10000); // 10000 ms = 10 detik
+      }
 
-            async function loadComPorts() {
-                const optionsContainer = document.getElementById('options-serialPort');
-                const hiddenInput = document.getElementById('serialPort');
-                const labelSpan = document.getElementById('label-serialPort');
+      function resetMicTestUI() {
+        if (micTestTimeout) clearTimeout(micTestTimeout);
+        if (playbackTimeout) clearTimeout(playbackTimeout); // Bersihkan timer playback juga
+        updateMicMeter(0);
 
-                if (window.pywebview && window.pywebview.api.get_available_com_ports) {
-                    try {
-                        const res = await window.pywebview.api.get_available_com_ports();
-                        optionsContainer.innerHTML = '';
+        const btnText = document.getElementById('micTestText');
+        const statusText = document.getElementById('micStatusText');
+        const icon = document.getElementById('micTestIcon');
 
-                        if (res.success && res.ports && res.ports.length > 0) {
-                            res.ports.forEach((p, index) => {
-                                const isSelected = index === 0 ? 'selected' : '';
-                                const displayName = `${p.device} (${p.description})`;
+        if (btnText) btnText.innerText = 'Test microphone';
+        if (statusText) statusText.innerText = '';
+        if (icon) icon.className = 'bi bi-mic-fill';
+      }
 
-                                if (index === 0 && (!hiddenInput.value || hiddenInput.value === "Pilih Port COM" || hiddenInput.value === "Tidak ada COM yang terdeteksi")) {
-                                    hiddenInput.value = p.device;
-                                    labelSpan.textContent = displayName;
-                                }
+      function updateMicMeter(level) {
+        const meterContainer = document.getElementById('micMeter');
+        if (!meterContainer) return;
+        const blocks = meterContainer.querySelectorAll('.meter-block');
 
-                                const div = document.createElement('div');
-                                div.className = `custom-option ${isSelected}`;
-                                div.setAttribute('data-value', p.device);
-                                div.textContent = displayName;
-                                div.setAttribute('onclick', `selectCustomOption('serialPort', '${p.device}', '${displayName}')`);
-
-                                optionsContainer.appendChild(div);
-                            });
-                        } else {
-                            labelSpan.textContent = "Tidak ada COM yang terdeteksi";
-                            hiddenInput.value = "";
-
-                            const div = document.createElement('div');
-                            div.className = 'custom-option';
-                            div.style.color = 'var(--text-muted)';
-                            div.style.cursor = 'default';
-                            div.textContent = "Tidak ada COM yang terdeteksi";
-                            optionsContainer.appendChild(div);
-                        }
-                    } catch (e) {
-                        console.error("Gagal memindai port COM:", e);
-                        labelSpan.textContent = "Gagal memindai port COM";
-                    }
-                }
-            }
-
-            function loadSettingsData() {
-                if (window.pywebview && window.pywebview.api) {
-                    isInitializing = true;
-
-                    window.pywebview.api.load_settings_from_json().then(data => {
-                        if (!data) {
-                            isInitializing = false;
-                            return;
-                        }
-
-                        if (data.inputDevice) {
-                            document.getElementById('inputDevice').value = data.inputDevice;
-                            document.getElementById('label-inputDevice').textContent = data.inputDevice;
-                        }
-                        if (data.outputDevice) {
-                            document.getElementById('outputDevice').value = data.outputDevice;
-                            document.getElementById('label-outputDevice').textContent = data.outputDevice;
-                        }
-                        if (data.micVolume) {
-                            document.getElementById('micVolume').value = data.micVolume;
-                            updateSliderLabel('micVolume', 'micVolText', '%');
-                        }
-                        if (data.speakerVolume) {
-                            document.getElementById('speakerVolume').value = data.speakerVolume;
-                            updateSliderLabel('speakerVolume', 'speakerVolText', '%');
-                        }
-                        if (data.activationMode) {
-                            setActivationMode(data.activationMode);
-                        }
-                        if (data.hardwareInterface) {
-                            if (data.hardwareInterface.enableHardwarePTT !== undefined) {
-                                document.getElementById('enableHardwarePTT').checked = data.hardwareInterface.enableHardwarePTT;
-                            }
-                            if (data.hardwareInterface.serialPort) {
-                                document.getElementById('serialPort').value = data.hardwareInterface.serialPort;
-                                document.getElementById('label-serialPort').textContent = data.hardwareInterface.serialPort;
-                            }
-                            if (data.hardwareInterface.pttPin) {
-                                document.getElementById('pttPin').value = data.hardwareInterface.pttPin;
-                                document.getElementById('label-pttPin').textContent = data.hardwareInterface.pttPin;
-                            }
-                            if (data.hardwareInterface.baudRate) {
-                                document.getElementById('baudRate').value = data.hardwareInterface.baudRate;
-                                document.getElementById('label-baudRate').textContent = data.hardwareInterface.baudRate;
-                            }
-                        }
-                        if (data.shortcuts) {
-                            if (data.shortcuts.pushToTalk) document.getElementById('shortcut-ptt').innerText = data.shortcuts.pushToTalk;
-                            if (data.shortcuts.toggleMute) document.getElementById('shortcut-mute').innerText = data.shortcuts.toggleMute;
-                            if (data.shortcuts.toggleDeafen) document.getElementById('shortcut-deafen').innerText = data.shortcuts.toggleDeafen;
-                        }
-                        if (data.notifications) {
-                            if (data.notifications.sound !== undefined) {
-                                document.getElementById('notifSound').checked = data.notifications.sound;
-                            }
-                            if (data.notifications.native !== undefined) {
-                                document.getElementById('nativeNotif').checked = data.notifications.native;
-                            }
-                            if (data.notifications.welcomeMessage) {
-                                const val = data.notifications.welcomeMessage;
-                                document.getElementById('welcomeMsg').value = val;
-                                let labelText = "Tampilkan sekali";
-                                if (val === "Always") labelText = "Selalu tampilkan";
-                                if (val === "Never") labelText = "Jangan pernah";
-                                document.getElementById('label-welcomeMsg').textContent = labelText;
-                            }
-                        }
-
-                        isInitializing = false;
-                    });
-                }
-            }
-
-            window.addEventListener('pywebviewready', function () {
-                if (window.pywebview && window.pywebview.api.apply_window_state) {
-                    window.pywebview.api.apply_window_state();
-                }
-                loadAudioDevices();
-                loadComPorts();
-            });
-
-            document.addEventListener('DOMContentLoaded', () => {
-                const titleBar = document.querySelector('.title-bar');
-
-                if (titleBar) {
-                    let isMouseDown = false;
-                    let startX = 0;
-                    let startY = 0;
-
-                    titleBar.addEventListener('mousedown', (e) => {
-                        if (e.target.closest('.title-controls') || e.target.closest('.connection-badge')) {
-                            return;
-                        }
-                        isMouseDown = true;
-                        startX = e.clientX;
-                        startY = e.clientY;
-                    });
-
-                    window.addEventListener('mousemove', (e) => {
-                        if (!isMouseDown) return;
-
-                        // Hitung jarak pergerakan mouse (geseran / drag)
-                        const moveX = Math.abs(e.clientX - startX);
-                        const moveY = Math.abs(e.clientY - startY);
-
-                        // Jika mouse bergeser lebih dari 5 piksel, anggap ini sebagai aksi DRAG
-                        if (moveX > 5 || moveY > 5) {
-                            isMouseDown = false; // Matikan agar tidak terpanggil terus menerus
-
-                            if (window.pywebview && window.pywebview.api && window.pywebview.api.reset_window_size) {
-                                window.pywebview.api.reset_window_size();
-                            }
-                        }
-                    });
-
-                    window.addEventListener('mouseup', () => {
-                        isMouseDown = false;
-                    });
-                }
-            });
-
-            // Fungsi Animasi Indikator Meter
-            function animateMeter(meterId, durationMs) {
-                const meterContainer = document.getElementById(meterId);
-                if (!meterContainer) return;
-                const blocks = meterContainer.querySelectorAll('.meter-block');
-
-                let interval = setInterval(() => {
-                    blocks.forEach((block, idx) => {
-                        // Nyalakan balok secara acak untuk simulasi level suara aktif
-                        if (Math.random() > 0.4) {
-                            block.style.background = idx > 5 ? '#e74c3c' : (idx > 3 ? '#f1c40f' : '#2ecc71');
-                        } else {
-                            block.style.background = 'var(--border-color)';
-                        }
-                    });
-                }, 100);
-
-                setTimeout(() => {
-                    clearInterval(interval);
-                    blocks.forEach(block => block.style.background = 'var(--border-color)');
-                }, durationMs);
-            }
-
-            // Handler Test Speaker
-            function runSpeakerTest() {
-                const selectedOutput = document.getElementById('outputDevice').value;
-                animateMeter('speakerMeter', 1000); // Animasi meter 1 detik
-
-                if (window.pywebview && window.pywebview.api.test_speaker) {
-                    window.pywebview.api.test_speaker(selectedOutput).then(res => {
-                        console.log(res.message);
-                    });
-                }
-            }
-
-            let micTestTimeout = null;
-            let playbackTimeout = null;
-
-            function toggleMicTest() {
-                const btnText = document.getElementById('micTestText');
-                const statusText = document.getElementById('micStatusText');
-                const selectedInput = document.getElementById('inputDevice').value;
-                const selectedOutput = document.getElementById('outputDevice').value;
-
-                if (btnText.innerText === 'Test microphone') {
-                    // Mulai Perekaman
-                    btnText.innerText = 'Stop recording';
-                    statusText.innerText = 'Recording... (Maksimal 10 detik)';
-
-                    if (window.pywebview) {
-                        window.pywebview.api.start_mic_test_record(selectedInput);
-                    }
-
-                    // Timer pengaman 15 detik di sisi frontend
-                    micTestTimeout = setTimeout(() => {
-                        if (btnText.innerText === 'Stop recording') {
-                            autoTransitionToPlayback();
-                        }
-                    }, 10000);
-                }
-                else if (btnText.innerText === 'Stop recording') {
-                    // Jika user menghentikan rekaman secara manual sebelum 15 detik
-                    if (micTestTimeout) clearTimeout(micTestTimeout);
-                    autoTransitionToPlayback();
-                }
-                else if (btnText.innerText === 'Stop playing') {
-                    // Jika user ingin membatalkan pemutaran di tengah jalan
-                    if (window.pywebview) {
-                        window.pywebview.api.stop_audio_test();
-                    }
-                    resetMicTestUI();
-                }
-            }
-
-            function autoTransitionToPlayback() {
-                if (micTestTimeout) clearTimeout(micTestTimeout);
-                if (playbackTimeout) clearTimeout(playbackTimeout);
-
-                const btnText = document.getElementById('micTestText');
-                const statusText = document.getElementById('micStatusText');
-                const selectedOutput = document.getElementById('outputDevice').value;
-
-                btnText.innerText = 'Stop playing';
-                statusText.innerText = 'Playing recorded audio...';
-                updateMicMeter(0);
-
-                if (window.pywebview) {
-                    window.pywebview.api.stop_mic_test_and_playback(selectedOutput);
-                }
-
-                // Otomatis kembali ke "Test microphone" setelah 10 detik masa pemutaran
-                playbackTimeout = setTimeout(() => {
-                    if (btnText.innerText === 'Stop playing') {
-                        if (window.pywebview && window.pywebview.api.stop_audio_test) {
-                            window.pywebview.api.stop_audio_test();
-                        }
-                        resetMicTestUI();
-                    }
-                }, 10000); // 10000 ms = 10 detik
-            }
-
-            function resetMicTestUI() {
-                if (micTestTimeout) clearTimeout(micTestTimeout);
-                if (playbackTimeout) clearTimeout(playbackTimeout); // Bersihkan timer playback juga
-                updateMicMeter(0);
-
-                const btnText = document.getElementById('micTestText');
-                const statusText = document.getElementById('micStatusText');
-                const icon = document.getElementById('micTestIcon');
-
-                if (btnText) btnText.innerText = 'Test microphone';
-                if (statusText) statusText.innerText = '';
-                if (icon) icon.className = 'bi bi-mic-fill';
-            }
-
-            function updateMicMeter(level) {
-                const meterContainer = document.getElementById('micMeter');
-                if (!meterContainer) return;
-                const blocks = meterContainer.querySelectorAll('.meter-block');
-
-                blocks.forEach((block, idx) => {
-                    if (idx < level) {
-                        block.style.background = idx > 5 ? '#e74c3c' : (idx > 3 ? '#f1c40f' : '#2ecc71');
-                    } else {
-                        block.style.background = 'var(--border-color)';
-                    }
-                });
-            }
-
-        </script>
-    </body>
-
+        blocks.forEach((block, idx) => {
+          if (idx < level) {
+            block.style.background = idx > 5 ? '#e74c3c' : idx > 3 ? '#f1c40f' : '#2ecc71';
+          } else {
+            block.style.background = 'var(--border-color)';
+          }
+        });
+      }
+    </script>
+  </body>
 </html>

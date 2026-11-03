@@ -1,23 +1,24 @@
 {
-    "inputDevice": "Microphone Array (2- Realtek(R) Audio)",
+    "inputDevice": "System default",
     "outputDevice": "System default",
-    "micVolume": "50",
-    "speakerVolume": "69",
+    "micVolume": "77",
+    "speakerVolume": "100",
     "activationMode": "Push to Talk",
+    "voiceThreshold": "-20",
     "hardwareInterface": {
         "enableHardwarePTT": false,
-        "serialPort": "",
+        "serialPort": "COM1",
         "pttPin": "RTS",
         "baudRate": "9600"
     },
     "shortcuts": {
         "pushToTalk": "SPACE",
         "toggleMute": "Ctrl+A",
-        "toggleDeafen": "Ctrl+J"
+        "toggleDeafen": "Ctrl+N"
     },
     "notifications": {
-        "sound": true,
+        "sound": false,
         "native": true,
-        "welcomeMessage": "Always"
+        "welcomeMessage": "Show once"
     }
 }
