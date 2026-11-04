@@ -100,6 +100,11 @@ class RoIPLoginAPI:
         @self.sio.event
         def connect():
             print("[SOCKET.IO] Terhubung ke WebSocket server pusat.")
+            # [PENTING] Daftarkan socket user ke server agar private chat dan status online berfungsi
+            if self.current_user and self.current_user.get("id"):
+                user_id = self.current_user.get("id")
+                self.sio.emit('register_user_socket', user_id)
+                print(f"[SOCKET.IO] Mengirim event register_user_socket untuk User ID: {user_id}")
 
         @self.sio.event
         def disconnect():
@@ -112,6 +117,17 @@ class RoIPLoginAPI:
         @self.sio.on('floor_denied')
         def on_floor_denied(data):
             print("[PTT] Floor ditolak oleh server:", data)
+
+        @self.sio.on('receive_private_chat')
+        def on_receive_private_chat(data):
+            print("[PRIVATE CHAT] Pesan masuk diterima:", data)
+            if self.window:
+                try:
+                    import json
+                    safe_data = json.dumps(data)
+                    self.window.evaluate_js(f"if(typeof displayPrivateMessage === 'function') {{ displayPrivateMessage({safe_data}); }}")
+                except Exception as e:
+                    print("Gagal mengevaluasi JS receive_private_chat:", e)
 
         @self.sio.on('update_user_connection')
         def on_update_user_connection(data):

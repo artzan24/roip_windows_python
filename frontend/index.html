@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="id">
+
   <head>
     <meta charset="UTF-8" />
     <title>Fancy Mumble - Dispatcher Console</title>
@@ -928,10 +929,7 @@
         </div>
         <div class="title-controls">
           <!-- Indikator Status Koneksi -->
-          <div
-            id="connection-status-badge"
-            class="connection-badge online"
-            style="display: flex; align-items: center; margin-right: 15px; font-size: 12px; font-weight: 500">
+          <div id="connection-status-badge" class="connection-badge online" style="display: flex; align-items: center; margin-right: 15px; font-size: 12px; font-weight: 500">
             <span id="status-dot" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px"></span>
             <span id="status-text">Online</span>
           </div>
@@ -1059,13 +1057,7 @@
                 <div class="ptt-instruction">Tekan lama atau spasi keyboard untuk berbicara</div>
 
                 <!-- Tombol PTT Bulat -->
-                <button
-                  class="ptt-round-btn"
-                  id="pttButton"
-                  onmousedown="startPTT()"
-                  onmouseup="stopPTT()"
-                  ontouchstart="startPTT()"
-                  ontouchend="stopPTT()"
+                <button class="ptt-round-btn" id="pttButton" onmousedown="startPTT()" onmouseup="stopPTT()" ontouchstart="startPTT()" ontouchend="stopPTT()"
                   title="Tekan atau Spasi untuk Bicara">
                   <i class="bi bi-mic-fill"></i>
                   <span id="pttBtnText">PTT</span>
@@ -1593,26 +1585,69 @@
       async function loadChannelChats(roomId) {
         const chatContainer = document.getElementById('chatContainer');
         chatContainer.innerHTML = '';
+
         if (window.pywebview && window.pywebview.api.fetch_channel_chats) {
           try {
             const res = await window.pywebview.api.fetch_channel_chats(roomId);
             if (res.success && res.chats && res.chats.length > 0) {
+              let lastRenderedDate = ''; // Variabel pelacak tanggal pesan terakhir
+
               res.chats.forEach((chat) => {
                 const isOutgoing = currentUser && chat.user_id === currentUser.id;
+
+                // Format tanggal dari database (asumsi format chat.created_at misal "YYYY-MM-DD HH:mm:ss" atau ISO string)
+                const chatDate = new Date(chat.created_at);
+                const dateString = formatDateLabel(chatDate); // Mendapatkan label tanggal (Hari Ini, Kemarin, atau Tanggal)
+
+                // Jika tanggal pesan ini berbeda dari pesan sebelumnya, buat pemisah tanggal (Date Divider)
+                if (dateString !== lastRenderedDate) {
+                  lastRenderedDate = dateString;
+                  const dateDividerHTML = `
+                            <div class="chat-date-divider text-center my-2">
+                                <span class="badge bg-secondary text-light px-3 py-1 rounded-pill" style="font-size: 0.75rem; opacity: 0.8;">
+                                    ${dateString}
+                                </span>
+                            </div>
+                        `;
+                  chatContainer.insertAdjacentHTML('beforeend', dateDividerHTML);
+                }
+
+                // Render gelembung chat seperti biasa
                 appendChatMessage(chat.username || 'Operator', chat.message, chat.created_at, isOutgoing);
               });
+
+              // Scroll otomatis ke paling bawah chat
+              chatContainer.scrollTop = chatContainer.scrollHeight;
+
             } else {
               chatContainer.innerHTML = `
-                                <div class="chat-bubble incoming">
-                                    <span class="bubble-sender">Sistem Dispatcher</span>
-                                    <span class="bubble-text">Belum ada riwayat pesan di channel ini. Mulai percakapan sekarang.</span>
-                                    <span class="bubble-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                </div>
-                            `;
+                    <div class="chat-bubble incoming">
+                        <span class="bubble-sender">Sistem Dispatcher</span>
+                        <span class="bubble-text">Belum ada riwayat pesan di channel ini. Mulai percakapan sekarang.</span>
+                        <span class="bubble-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                `;
             }
           } catch (e) {
             console.error('Gagal memuat riwayat chat:', e);
           }
+        }
+      }
+
+      // Fungsi pembantu untuk mengubah objek Date menjadi label ala WhatsApp ("Hari Ini", "Kemarin", atau format tanggal)
+      function formatDateLabel(dateObj) {
+        const today = new Date();
+        const yesterday = new Date();
+        yesterday.setDate(today.getDate() - 1);
+
+        if (dateObj.toDateString() === today.toDateString()) {
+          return 'Hari Ini';
+        } else if (dateObj.toDateString() === yesterday.toDateString()) {
+          return 'Kemarin';
+        } else {
+          // Format tanggal standar, contoh: 05 Nov 2026
+          const options = { day: 'numeric', month: 'short', year: 'numeric' };
+          return dateObj.toLocaleDateString('id-ID', options);
         }
       }
 
@@ -1970,4 +2005,5 @@
       });
     </script>
   </body>
+
 </html>
