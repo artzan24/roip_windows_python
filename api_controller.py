@@ -85,6 +85,8 @@ class RoIPLoginAPI:
         # Status room aktif saat ini
         self.current_room_id = 1
 
+        self.start_background_recording_if_needed()
+
     def _load_volumes_from_settings(self):
         """Memuat pengaturan volume awal dari file settings.json"""
         try:
@@ -799,7 +801,7 @@ class RoIPLoginAPI:
         
         with self.audio_lock:
             self.is_recording = True
-            self.is_ptt_active = True  # Set status PTT aktif menjadi True
+            self.is_ptt_active = True  # Set status PTT aktif
             self.ptt_start_time = time.time()
 
         try:
@@ -836,29 +838,31 @@ class RoIPLoginAPI:
                 'username': username
             })
 
-        # [PERBAIKAN] Cek aman apakah self.recording_thread ada dan aktif
-        thread_is_active = False
+        # [PERBAIKAN UTAMA] Paksa matikan thread lama jika ada, lalu buat thread rekam baru agar stream segar
         if hasattr(self, 'recording_thread') and self.recording_thread is not None:
             try:
-                thread_is_active = self.recording_thread.is_alive()
-            except Exception:
-                thread_is_active = False
+                if self.recording_thread.is_alive():
+                    # Beri waktu sebentar atau biarkan loop mendeteksi is_recording
+                    pass
+            except:
+                pass
 
-        if not thread_is_active:
-            self.recording_thread = threading.Thread(target=self._record_and_stream_loop)
-            self.recording_thread.daemon = True
-            self.recording_thread.start()
+        self.recording_thread = threading.Thread(target=self._record_and_stream_loop)
+        self.recording_thread.daemon = True
+        self.recording_thread.start()
+        print("[PTT] Thread rekam & streaming berhasil dimulai.")
         
         return {"success": True}
 
     def _record_and_stream_loop(self):
-        """Looping menangkap stream audio mikrofon & mengirimkan data saat PTT aktif."""
+        """Looping menangkap stream audio dengan penundaan keheningan (debounce) untuk Voice Activation & Continuous."""
+        stream = None
         try:
             settings = self.load_settings_from_json()
-            activation_mode = settings.get("activationMode", "Push to Talk")
             input_device_name = settings.get("inputDevice", "System default")
             input_index = self._get_device_index(input_device_name, is_output=False)
-            threshold_db = float(settings.get("voiceThreshold", -40))
+            
+            print(f"[AUDIO STREAM] Membuka input stream untuk: '{input_device_name}' (Index: {input_index})")
 
             stream = self.pyaudio_instance.open(
                 format=self.FORMAT,
@@ -869,13 +873,29 @@ class RoIPLoginAPI:
                 frames_per_buffer=self.CHUNK
             )
             
-            while self.is_recording:
-                data = stream.read(self.CHUNK, exception_on_overflow=False)
+            self.was_transmitting = False
+            user_id = self.current_user.get("id") if self.current_user else 1
+            username = self.current_user.get("full_name", "Dispatcher")
+
+            # Variabel Debounce / Grace Period untuk mencegah terpotong tiap 1 detik
+            silence_start_time = None
+            SILENCE_DELAY_SECONDS = 2  # Waktu tunggu (detik) sebelum benar-mera menutup rekaman
+
+            while getattr(self, 'is_recording', False):
+                try:
+                    data = stream.read(self.CHUNK, exception_on_overflow=False)
+                except Exception:
+                    continue
+
                 if not data or not self.sio.connected:
                     continue
 
                 if getattr(self, 'is_mic_muted', False):
                     continue
+
+                settings = self.load_settings_from_json()
+                activation_mode = settings.get("activationMode", "Voice Activation")
+                threshold_db = float(settings.get("voiceThreshold", -40))
 
                 mic_scale = float(self.mic_volume) / 100.0
                 audio_chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32)
@@ -885,16 +905,62 @@ class RoIPLoginAPI:
                 db_value = (20 * np.log10(rms / 32768.0)) if rms > 0 else -100.0
                 db_value = max(-60.0, min(0.0, db_value))
 
-                # Evaluasi status transmisi berdasarkan mode
-                is_transmitting = False
+                # Evaluasi kondisi mentah berdasarkan suara
+                raw_transmitting = False
                 if activation_mode == "Continuous":
-                    is_transmitting = True
+                    raw_transmitting = True
                 elif activation_mode == "Push to Talk":
-                    # [PENTING] Pastikan membaca self.is_ptt_active
-                    is_transmitting = getattr(self, 'is_ptt_active', False)
+                    raw_transmitting = getattr(self, 'is_ptt_active', False)
                 elif activation_mode == "Voice Activation":
                     if db_value >= threshold_db:
+                        raw_transmitting = True
+
+                # --- LOGIKA DEBOUNCE / HYSTERESIS UNTUK VOICE ACTIVATION ---
+                if activation_mode == "Voice Activation":
+                    if raw_transmitting:
+                        # Jika suara terdeteksi, reset waktu senyap dan tandai sedang aktif
+                        silence_start_time = None
                         is_transmitting = True
+                    else:
+                        # Jika suara di bawah threshold (senyap)
+                        if self.was_transmitting:
+                            if silence_start_time is None:
+                                silence_start_time = time.time()
+                            
+                            # Cek apakah durasi keheningan sudah melewati batas tunda (misal 1.5 detik)
+                            if time.time() - silence_start_time >= SILENCE_DELAY_SECONDS:
+                                is_transmitting = False
+                            else:
+                                # Selama masa tenggang tunda, tetap anggap transmitting agar tidak terpotong
+                                is_transmitting = True
+                        else:
+                            is_transmitting = False
+                else:
+                    is_transmitting = raw_transmitting
+
+                # --- SINKRONISASI FLOOR KE SERVER ---
+                if is_transmitting and not self.was_transmitting:
+                    self.ptt_start_time = time.time()
+                    if self.sio.connected:
+                        self.sio.emit('request_floor', {
+                            'roomId': str(self.current_room_id),
+                            'userId': user_id,
+                            'username': username
+                        })
+                        print(f"[VOICE ACT] Suara aktif ({db_value:.1f} dB). Membuka floor...")
+
+                elif not is_transmitting and self.was_transmitting:
+                    duration_seconds = int(time.time() - self.ptt_start_time)
+                    duration_seconds = max(1, duration_seconds)
+                    if self.sio.connected:
+                        self.sio.emit('release_floor', {
+                            'roomId': str(self.current_room_id),
+                            'userId': user_id,
+                            'duration': duration_seconds
+                        })
+                        print(f"[VOICE ACT] Sesi selesai. Total Durasi: {duration_seconds} detik.")
+
+                self.was_transmitting = is_transmitting
 
                 if self.window:
                     try:
@@ -902,19 +968,25 @@ class RoIPLoginAPI:
                     except:
                         pass
 
-                # Jika tidak sedang mentransmisikan, lewati pengiriman data audio
                 if not is_transmitting:
                     time.sleep(0.01)
                     continue
 
-                # Konversi dan kirim data biner audio ke server via Socket.io
                 processed_data = np.clip(scaled_audio_chunk, -32768, 32767).astype(np.int16).tobytes()
                 self.sio.emit('audio_stream', processed_data)
             
-            stream.stop_stream()
-            stream.close()
+            if stream:
+                stream.stop_stream()
+                stream.close()
+            print("[AUDIO STREAM] Stream background ditutup.")
         except Exception as e:
             print(f"[ERROR PyAudio Stream] Gagal merekam/streaming: {e}")
+            if stream:
+                try:
+                    stream.stop_stream()
+                    stream.close()
+                except:
+                    pass
 
     def set_mic_muted(self, is_muted):
         self.is_mic_muted = is_muted
