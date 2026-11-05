@@ -163,7 +163,7 @@ def main():
     start_connection_monitor(window, ip_server, port)
     
     # 5. Menjalankan aplikasi pywebview
-    webview.start(setup_window_position, window, debug=True)
+    webview.start(setup_window_position, window, debug=False)
 
 if __name__ == '__main__':
     main()

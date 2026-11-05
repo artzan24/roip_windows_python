@@ -173,13 +173,18 @@ class RoIPLoginAPI:
                 except Exception as e:
                     print(f"[ERROR LOG] Gagal mengevaluasi JS user_room_changed: {e}")
 
-        @self.sio.on('audio_stream_incoming')
-        def on_audio_stream_incoming(data):
+   
+        @self.sio.on('audio_stream')
+        def on_audio_stream(data):
             try:
-                channel_id = data.get('roomId') or self.current_room_id
-                audio_bytes = data.get('audioData')
-                if audio_bytes:
-                    self.handle_incoming_channel_audio(channel_id, audio_bytes)
+                # Jika server mengirim buffer biner mentah atau JSON object
+                if isinstance(data, bytes):
+                    self.handle_incoming_channel_audio(self.current_room_id, data)
+                elif isinstance(data, dict):
+                    channel_id = data.get('roomId') or self.current_room_id
+                    audio_bytes = data.get('audioData')
+                    if audio_bytes:
+                        self.handle_incoming_channel_audio(channel_id, audio_bytes)
             except Exception as e:
                 print(f"[SOCKET AUDIO ERROR] Gagal memproses audio masuk: {e}")
 
@@ -721,7 +726,12 @@ class RoIPLoginAPI:
     def start_background_recording_if_needed(self):
         try:
             settings = self.load_settings_from_json()
-            activation_mode = settings.get("activationMode", "Voice Activation")
+            activation_mode = settings.get("activationMode", "Push to Talk")
+            
+            # Jangan jalankan background recording jika mode adalah Push to Talk!
+            if activation_mode == "Push to Talk":
+                return
+
             if activation_mode in ["Voice Activation", "Continuous"]:
                 with self.audio_lock:
                     if not getattr(self, 'is_recording', False):
@@ -745,21 +755,16 @@ class RoIPLoginAPI:
             return {"success": False, "message": str(e)}
 
     def start_ptt(self):
-        print("[DEBUG LOG - PTT] Tombol PTT ditekan, meminta floor ke server...")
+        print("[DEBUG LOG - PTT] Memulai audio setelah floor granted...")
         with self.audio_lock:
+            if self.is_recording:
+                return {"success": True, "message": "Audio sudah aktif"}
             self.is_recording = True
-            self.is_ptt_active = True 
+            self.is_ptt_active = True
             self.ptt_start_time = time.time()
-
-        if self.sio.connected:
-            user_id = self.current_user.get("id") if self.current_user else 1
-            username = self.current_user.get("full_name", "Dispatcher")
-            self.sio.emit('request_floor', {
-                'roomId': str(self.current_room_id),
-                'userId': user_id,
-                'username': username
-            })
-
+            if not self.recording_thread or not self.recording_thread.is_alive():
+                self.recording_thread = threading.Thread(target=self._record_and_stream_loop, daemon=True)
+                self.recording_thread.start()
         return {"success": True}
 
     def _record_and_stream_loop(self):
@@ -803,24 +808,12 @@ class RoIPLoginAPI:
                 except:
                     pass
 
-    def release_ptt(self, room_id=1, user_id=1):
-        print("[DEBUG LOG - PTT] Tombol PTT dilepas. Mengirim release_floor ke server...")
-        self.is_recording = False
-        self.is_ptt_active = False 
-        
-        duration_seconds = int(time.time() - getattr(self, 'ptt_start_time', time.time()))
-        duration_seconds = max(1, duration_seconds)
-
-        if self.sio.connected:
-            r_id = str(room_id or self.current_room_id)
-            u_id = user_id or (self.current_user.get("id") if self.current_user else 1)
-            
-            self.sio.emit('release_floor', {
-                'roomId': r_id,
-                'userId': u_id,
-                'duration': duration_seconds
-            })
-
+    def release_ptt(self, room_id=None, user_id=None):
+        print("[DEBUG LOG - PTT] Menghentikan audio stream...")
+        with self.audio_lock:
+            self.is_recording = False
+            self.is_ptt_active = False
+        duration_seconds = max(1, int(time.time() - self.ptt_start_time))
         return {"success": True, "duration": duration_seconds}
 
     def process_incoming_audio_stream(self, raw_audio_data):
