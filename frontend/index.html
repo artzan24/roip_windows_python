@@ -1552,9 +1552,9 @@
         });
 
         socket.on('user_ptt_broadcast', (data) => {
-          console.log('[PTT BROADCAST] Status PTT diterima:', data);
-          const transmitting = data.isTransmitting === true || data.isTransmitting === 1 || data.isTransmitting === '1';
-          handlePeerPTTStatus(data, transmitting);
+          console.log('[PTT BROADCAST] Status diterima:', data);
+
+          handlePeerPTTStatus(data, data.isTransmitting);
         });
 
         socket.on('floor_released', (data) => {
