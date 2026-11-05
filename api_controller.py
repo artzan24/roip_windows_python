@@ -111,28 +111,6 @@ class RoIPLoginAPI:
                 self.sio.emit('register_user_socket', user_id)
                 print(f"[SOCKET.IO] Mengirim event register_user_socket untuk User ID: {user_id}")
 
-        # --- EVENT LIVE CHAT CHANNEL ---
-        @self.sio.on('receive_channel_chat')
-        def on_receive_channel_chat(data):
-            print(f"[DEBUG LOG - CHAT CHANNEL] Pesan diterima dari server: {data}")
-            if self.window:
-                try:
-                    safe_data = json.dumps(data)
-                    self.window.evaluate_js(f"if(typeof displayChannelMessage === 'function') {{ displayChannelMessage({safe_data}); }}")
-                except Exception as e:
-                    print(f"[ERROR LOG] Gagal mengevaluasi JS receive_channel_chat: {e}")
-
-        # --- EVENT LIVE CHAT PRIVATE ---
-        @self.sio.on('receive_private_chat')
-        def on_receive_private_chat(data):
-            print(f"[DEBUG LOG - PRIVATE CHAT] Pesan pribadi diterima: {data}")
-            if self.window:
-                try:
-                    safe_data = json.dumps(data)
-                    self.window.evaluate_js(f"if(typeof displayPrivateMessage === 'function') {{ displayPrivateMessage({safe_data}); }}")
-                except Exception as e:
-                    print(f"[ERROR LOG] Gagal mengevaluasi JS receive_private_chat: {e}")
-
         # --- EVENT PTT & STATUS BUSY/READY ---
         @self.sio.on('user_ptt_broadcast')
         def on_user_ptt_broadcast(data):
