@@ -1160,7 +1160,7 @@
       let activeChannelId = null;
       let isMicMuted = false;
       let isDeafened = false;
-      let timerInterval = null; // Diperbaiki: Deklarasi variabel global timerInterval
+      let timerInterval = null;
 
       // Variabel Global Tambahan untuk fitur Private Chat & Voice Call
       let currentViewMode = 'channel'; // 'channel' atau 'private'
@@ -1205,7 +1205,6 @@
               if (settings.shortcuts) userShortcuts = settings.shortcuts;
               if (settings.activationMode) {
                 currentActivationMode = settings.activationMode;
-                console.log('[SETTINGS] Activation Mode dimuat:', currentActivationMode);
               }
             }
             applyActivationModeUI();
@@ -1335,9 +1334,8 @@
         document.getElementById('userAvatarInitials').innerHTML = `${initials}<span class="user-avatar-dot"></span>`;
       }
 
-      // --- MANAJEMEN STATUS KONEKSI & UI BADGE (TERPADU & ANTI DOBEL) ---
       let wasOffline = false;
-      let isAlertOpen = false; // Flag tunggal untuk mencegah SweetAlert ganda
+      let isAlertOpen = false;
       let backgroundCheckInterval = null;
 
       function updateStatusUI(state, text) {
@@ -1351,7 +1349,6 @@
         statusText.innerText = text;
       }
 
-      // Fungsi validasi gabungan Internet & Server Lokal
       async function checkAllConnections() {
         if (!navigator.onLine) {
           return { status: 'offline', title: 'Koneksi Internet Terputus', message: 'Akses internet terdeteksi terganggu.' };
@@ -1376,7 +1373,6 @@
         return { status: 'online', title: 'Terhubung', message: 'Semua sistem normal.' };
       }
 
-      // Menampilkan satu SweetAlert tunggal yang paling akurat
       async function triggerConnectionLostAlert() {
         if (isAlertOpen) return;
 
@@ -1414,7 +1410,6 @@
 
       function startBackgroundAutoReconnect() {
         if (backgroundCheckInterval) return;
-        console.log('[BACKGROUND_MONITOR] Memulai background auto-reconnect gabungan...');
 
         backgroundCheckInterval = setInterval(async () => {
           if (isBackgroundChecking) return;
@@ -1424,13 +1419,11 @@
             const check = await checkAllConnections();
 
             if (check.status === 'online') {
-              console.log('[BACKGROUND_MONITOR] Jaringan & Server PULIH!');
               stopBackgroundAutoReconnect();
 
               isAlertOpen = false;
               wasOffline = false;
 
-              // Tutup SweetAlert2 secara aman & bersihkan backdrop
               if (typeof Swal !== 'undefined' && Swal.isVisible()) {
                 Swal.close();
                 const swalContainer = document.querySelector('.swal2-container');
@@ -1458,12 +1451,10 @@
         if (backgroundCheckInterval) {
           clearInterval(backgroundCheckInterval);
           backgroundCheckInterval = null;
-          console.log('[BACKGROUND_MONITOR] Background monitor dihentikan.');
         }
       }
 
       window.addEventListener('online', async function () {
-        console.log('[NETWORK] Browser mendeteksi jaringan ONLINE.');
         const check = await checkAllConnections();
         if (check.status === 'online') {
           stopBackgroundAutoReconnect();
@@ -1479,7 +1470,6 @@
       });
 
       window.addEventListener('offline', function () {
-        console.log('[NETWORK] Browser mendeteksi jaringan OFFLINE.');
         triggerConnectionLostAlert();
       });
 
@@ -1564,7 +1554,7 @@
           loadOnlineMembers();
         });
 
-        // --- 1. LIVE CHAT CHANNEL ---
+        // --- 1. LIVE CHAT CHANNELS / GROUPS ---
         socket.on('receive_channel_chat', (data) => {
           displayChannelMessage(data);
         });
@@ -1577,20 +1567,19 @@
           displayPrivateMessage(data);
         });
 
-        // --- 3. PTT FLOOR CONTROL & BROADCAST USER LAIN ---
+        // --- 3. PTT FLOOR CONTROL & BUSY STATUS ---
         socket.on('floor_granted', (data) => {
           console.log('[PTT] Floor diberikan oleh server.');
         });
 
         socket.on('floor_denied', (data) => {
-          console.warn('[PTT] Floor ditolak:', data.message);
           isTransmittingState = false;
           resetPttUI();
           Swal.fire({
             toast: true,
             position: 'top-end',
             icon: 'warning',
-            title: data.message || 'Channel sedang digunakan',
+            title: data.message || 'Channel sedang digunakan (Busy)',
             showConfirmButton: false,
             timer: 2000,
           });
@@ -1631,29 +1620,32 @@
         });
       }
 
-      // --- FUNGSI MANAJEMEN STATUS PTT PEER & PENGUNCIAN TOMBOL ---
+      // --- LOGIKA PENGUNCIAN PTT JIKA USER LAIN BERBICARA (BUSY) ---
       function handlePeerPTTChange(data, isTransmitting) {
         if (String(data.roomId) === String(currentRoomId)) {
           const activeSpeakerName = document.getElementById('activeSpeakerName');
           const pttIndicator = document.getElementById('pttIndicator');
           const pttBtn = document.getElementById('pttButton');
           const myUserId = currentUser ? String(currentUser.id) : '';
-          const peerUserId = String(data.userId || '');
+          const peerUserId = String(data.userId || data.sender_id || '');
 
           if (isTransmitting && peerUserId !== myUserId) {
+            // User lain sedang berbicara -> PTT di halaman kita menjadi BUSY dan tidak bisa diklik
             if (activeSpeakerName) {
-              activeSpeakerName.innerText = data.username || 'User Lain (On Air)';
+              activeSpeakerName.innerText = data.username || data.sender_name || 'User Lain (On Air)';
             }
             if (pttIndicator) {
-              pttIndicator.innerText = `${(data.username || 'USER').toUpperCase()} ON AIR`;
+              pttIndicator.innerText = `${(data.username || data.sender_name || 'USER').toUpperCase()} ON AIR (BUSY)`;
               pttIndicator.style.color = '#ef4444';
             }
             if (pttBtn) {
               pttBtn.style.opacity = '0.4';
               pttBtn.style.cursor = 'not-allowed';
               pttBtn.disabled = true;
+              pttBtn.title = 'Channel sedang digunakan (Busy)';
             }
           } else if (!isTransmitting) {
+            // Selesai berbicara -> PTT kembali standby dan bisa digunakan
             if (activeSpeakerName) {
               activeSpeakerName.innerText = 'Belum ada transmisi';
             }
@@ -1665,6 +1657,7 @@
               pttBtn.style.opacity = '1';
               pttBtn.style.cursor = 'pointer';
               pttBtn.disabled = false;
+              pttBtn.title = 'Tekan atau Spasi untuk Bicara';
             }
           }
         }
@@ -1676,7 +1669,12 @@
         const pttIndicator = document.getElementById('pttIndicator');
         const activeSpeakerName = document.getElementById('activeSpeakerName');
 
-        if (pttBtn) pttBtn.classList.remove('active');
+        if (pttBtn) {
+          pttBtn.classList.remove('active');
+          pttBtn.disabled = false;
+          pttBtn.style.opacity = '1';
+          pttBtn.style.cursor = 'pointer';
+        }
         if (pttBtnText) pttBtnText.innerText = 'PTT';
         if (pttIndicator) {
           pttIndicator.innerText = 'STANDBY';
@@ -1685,8 +1683,11 @@
         if (activeSpeakerName) activeSpeakerName.innerText = 'Belum ada transmisi';
       }
 
+      // --- PEMBARUAN LIVE CHAT: CHANNELS/GROUPS & PRIVATE CHAT ---
       function displayChannelMessage(data) {
-        if (String(data.roomId) === String(currentRoomId)) {
+        // Mendukung multi-format kunci dari server (roomId / channel_id)
+        const msgRoomId = String(data.roomId || data.channel_id || data.room_id || '');
+        if (msgRoomId === String(currentRoomId) && currentViewMode === 'channel') {
           const isMyMessage = currentUser && String(data.userId || data.sender_id) === String(currentUser.id);
           if (!isMyMessage) {
             appendChatMessage(data.username || data.sender_name || 'Operator', data.message, data.created_at || new Date(), false);
@@ -1695,9 +1696,17 @@
       }
 
       function displayPrivateMessage(data) {
-        const senderId = data.sender_id || data.userId;
-        if (currentViewMode === 'private' && String(activeTargetUserId) === String(senderId)) {
-          appendChatMessage(data.sender_name || data.username || 'User', data.message, data.created_at || new Date(), false);
+        const senderId = String(data.sender_id || data.userId || '');
+        const receiverId = String(data.receiver_id || '');
+        const myId = currentUser ? String(currentUser.id) : '';
+
+        // Tampilkan jika percakapan pribadi melibatkan user saat ini dan target yang aktif di layar
+        if (currentViewMode === 'private') {
+          if (senderId === String(activeTargetUserId) || (senderId === myId && receiverId === String(activeTargetUserId))) {
+            const isOutgoing = senderId === myId;
+            const senderName = isOutgoing ? (currentUser ? currentUser.full_name : 'Saya') : activeTargetUserName || 'User';
+            appendChatMessage(senderName, data.message, data.created_at || new Date(), isOutgoing);
+          }
         }
       }
 
@@ -1795,8 +1804,15 @@
         if (!container) return;
         container.innerHTML = '';
 
+        let membersList = members;
+        // Jika server mengembalikan objek bersarang atau format khusus
+        if (members && !Array.isArray(members) && members.data) {
+          membersList = members.data;
+        }
+        if (!Array.isArray(membersList)) membersList = [];
+
         const myUserId = currentUser ? String(currentUser.id) : String(localStorage.getItem('user_id') || '');
-        const filteredMembers = members.filter((member) => {
+        const filteredMembers = membersList.filter((member) => {
           const mId = String(member.id || member.user_id || '');
           return mId !== myUserId;
         });
@@ -1990,6 +2006,22 @@
               <span class="bubble-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
           </div>
         `;
+
+        // Integrasi API opsional untuk riwayat private chat jika disediakan backend
+        if (window.pywebview && window.pywebview.api.fetch_private_chats) {
+          try {
+            const res = await window.pywebview.api.fetch_private_chats(targetUserId);
+            if (res.success && res.chats && res.chats.length > 0) {
+              res.chats.forEach((chat) => {
+                const isOutgoing = String(chat.sender_id) === String(currentUser.id);
+                const senderName = isOutgoing ? currentUser.full_name : activeTargetUserName;
+                appendChatMessage(senderName, chat.message, chat.created_at, isOutgoing);
+              });
+            }
+          } catch (e) {
+            console.log('Riwayat private chat belum dimuat atau endpoint belum tersedia.');
+          }
+        }
       }
 
       async function loadChannelChats(roomId) {
@@ -2018,7 +2050,7 @@
                   chatContainer.insertAdjacentHTML('beforeend', dateDividerHTML);
                 }
 
-                appendChatMessage(chat.username || 'Operator', chat.message, chat.created_at, isOutgoing);
+                appendChatMessage(chat.username || chat.sender_name || 'Operator', chat.message, chat.created_at, isOutgoing);
               });
               chatContainer.scrollTop = chatContainer.scrollHeight;
             } else {
@@ -2139,6 +2171,8 @@
       function sendMessage() {
         if (currentViewMode === 'private' && activeTargetUserId) {
           sendPrivateMessage(activeTargetUserId);
+          const input = document.getElementById('messageInput');
+          if (input) input.value = '';
           return;
         }
 
@@ -2190,14 +2224,14 @@
         return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       }
 
-      // --- PTT START & STOP DENGAN FLOOR CONTROL ---
+      // --- PTT START & STOP DENGAN FLOOR CONTROL & BUSY GUARD ---
       function startPTT() {
         if (isMicMuted) return;
         if (currentActivationMode !== 'Push to Talk') return;
 
         const pttBtn = document.getElementById('pttButton');
         if (pttBtn && pttBtn.disabled) {
-          console.warn('[PTT] Tombol terkunci, channel sedang digunakan.');
+          console.warn('[PTT] Tombol terkunci, channel sedang digunakan (Busy).');
           return;
         }
 
@@ -2217,7 +2251,6 @@
           activeSpeakerName.innerText = currentUser.full_name;
         }
 
-        // Emit permintaan floor ke server socket.io Node.js
         if (socket && socket.connected) {
           socket.emit('request_floor', {
             roomId: currentRoomId,
@@ -2238,7 +2271,6 @@
         isTransmittingState = false;
         resetPttUI();
 
-        // Emit pelepasan floor ke server socket.io Node.js
         if (socket && socket.connected) {
           socket.emit('release_floor', {
             roomId: currentRoomId,
@@ -2279,6 +2311,9 @@
         if (currentActivationMode === 'Push to Talk') {
           if (userShortcuts.pushToTalk && !userShortcuts.pushToTalk.toLowerCase().includes('mouse')) {
             if (matchesShortcut(e, userShortcuts.pushToTalk)) {
+              const pttBtn = document.getElementById('pttButton');
+              if (pttBtn && pttBtn.disabled) return; // Mencegah spasi saat busy
+
               if (!isShortcutPressed) {
                 isShortcutPressed = true;
                 e.preventDefault();
@@ -2320,6 +2355,9 @@
 
       window.addEventListener('mousedown', (e) => {
         if (currentActivationMode === 'Push to Talk') {
+          const pttBtn = document.getElementById('pttButton');
+          if (pttBtn && pttBtn.disabled) return;
+
           if (e.button === 2 && userShortcuts.pushToTalk && userShortcuts.pushToTalk.toLowerCase().includes('mouse')) {
             startPTT();
           }
