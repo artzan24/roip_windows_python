@@ -1543,15 +1543,16 @@
         });
 
         socket.on('floor_denied', (data) => {
-          console.log('[PTT] Floor DITOLAK (Busy):', data);
+          console.warn('[PTT] Floor DITOLAK (Busy):', data);
           isTransmittingState = false;
           resetPttUI();
-          handlePeerPTTStatus({ username: 'User Lain', sender_name: 'User Lain', roomId: currentRoomId }, true);
+
+          // Tampilkan toast peringatan ringkas
           Swal.fire({
             toast: true,
             position: 'top-end',
             icon: 'warning',
-            title: data.message || 'Channel sedang digunakan (Busy / Transmitting)',
+            title: data.message || 'Channel sedang digunakan (Busy)',
             showConfirmButton: false,
             timer: 2000,
           });
@@ -1560,6 +1561,8 @@
         socket.on('user_ptt_broadcast', (data) => {
           console.log('[PTT BROADCAST] Status PTT diterima:', data);
           const transmitting = data.isTransmitting === true || data.isTransmitting === 1 || data.isTransmitting === '1';
+
+          // Pastikan pengecekan ID tidak mengunci diri sendiri secara keliru
           handlePeerPTTStatus(data, transmitting);
         });
 
@@ -1606,18 +1609,21 @@
           const myUserId = currentUser ? String(currentUser.id) : '';
           const peerUserId = String(data.userId || data.sender_id || data.user_id || '');
 
-          // Abaikan jika event broadcast berasal dari perangkat sendiri
+          // Jika broadcast datang dari diri sendiri dan isTransmitting False, abaikan penguncian busy
           if (peerUserId && myUserId && peerUserId === myUserId) {
+            if (!isTransmitting) {
+              resetPttUI();
+            }
             return;
           }
 
           if (isTransmitting) {
-            // Status: SIBUK (Busy / On Air)
+            // Status: SIBUK (Busy / On Air oleh user lain)
             if (activeSpeakerName) {
               activeSpeakerName.innerText = data.username || data.sender_name || 'User Lain (On Air)';
             }
             if (pttIndicator) {
-              pttIndicator.innerText = `${(data.username || data.sender_name || 'USER').toUpperCase()} ON AIR (SIBOK / BUSY)`;
+              pttIndicator.innerText = `${(data.username || data.sender_name || 'USER').toUpperCase()} ON AIR (BUSY)`;
               pttIndicator.style.color = '#ef4444';
             }
             if (pttBtn) {
@@ -1627,7 +1633,7 @@
               pttBtn.title = 'Channel sedang digunakan (Busy)';
             }
           } else {
-            // Status: SIAP / READY (Standby)
+            // Status: SIAP / READY (Semua user sudah lepas PTT)
             if (activeSpeakerName) {
               activeSpeakerName.innerText = 'Belum ada transmisi';
             }
@@ -1709,14 +1715,26 @@
         if (!container) return;
         container.innerHTML = '';
 
+        let roomsList = rooms;
+        // Tangani jika data rooms berada di dalam properti objek respons
+        if (rooms && !Array.isArray(rooms) && rooms.rooms) {
+          roomsList = rooms.rooms;
+        }
+        if (!Array.isArray(roomsList)) roomsList = [];
+
         let userCurrentRoom = null;
         if (currentUser && currentUser.current_room !== undefined && currentUser.current_room !== null) {
           userCurrentRoom = String(currentUser.current_room).trim();
         }
 
-        rooms.forEach((room, index) => {
-          const roomId = String(room.id || room.room_id || room.channel_code || index).trim();
-          const roomName = String(room.name || room.channel_name || room.title || '').trim();
+        roomsList.forEach((room, index) => {
+          // Mendukung berbagai variasi penamaan kunci dari backend (id, room_id, channel_code, dll)
+          const roomId = String(room.id || room.room_id || room.channel_code || room.room_code || index).trim();
+
+          // Mendukung berbagai variasi kunci nama room dari backend (name, channel_name, room_name, title)
+          const roomName = String(
+            room.name || room.channel_name || room.room_name || room.title || room.room_code || 'Channel ' + (index + 1),
+          ).trim();
 
           let isMatched = false;
           if (userCurrentRoom) {
@@ -1745,20 +1763,21 @@
           container.insertAdjacentHTML('beforeend', rowHtml);
         });
 
-        if (rooms.length > 0) {
-          let targetRoom = rooms[0];
+        if (roomsList.length > 0) {
+          let targetRoom = roomsList[0];
           if (userCurrentRoom) {
-            const found = rooms.find((r) => {
-              const rId = String(r.id || r.room_id || r.channel_code || '').trim();
-              const rName = String(r.name || r.channel_name || r.title || '')
+            const found = roomsList.find((r) => {
+              const rId = String(r.id || r.room_id || r.channel_code || r.room_code || '').trim();
+              const rName = String(r.name || r.channel_name || r.room_name || r.title || '')
                 .trim()
                 .toLowerCase();
               return rId === userCurrentRoom || rName === userCurrentRoom.toLowerCase();
             });
             if (found) targetRoom = found;
           }
-          const targetId = targetRoom.id || targetRoom.room_id || targetRoom.channel_code || 0;
-          const targetName = targetRoom.name || targetRoom.channel_name || targetRoom.title || 'Channel Radio';
+          const targetId = targetRoom.id || targetRoom.room_id || targetRoom.channel_code || targetRoom.room_code || 0;
+          const targetName =
+            targetRoom.name || targetRoom.channel_name || targetRoom.room_name || targetRoom.title || targetRoom.room_code || 'Channel Radio';
           selectChannel(targetId, targetName);
         }
       }
