@@ -1160,9 +1160,7 @@
       let activeChannelId = null;
       let isMicMuted = false;
       let isDeafened = false;
-      let timerInterval = null;
 
-      // Variabel Global Tambahan untuk fitur Private Chat & Voice Call
       let currentViewMode = 'channel'; // 'channel' atau 'private'
       let activeTargetUserId = null;
       let activeTargetUserName = null;
@@ -1334,7 +1332,6 @@
         document.getElementById('userAvatarInitials').innerHTML = `${initials}<span class="user-avatar-dot"></span>`;
       }
 
-      let wasOffline = false;
       let isAlertOpen = false;
       let backgroundCheckInterval = null;
 
@@ -1380,7 +1377,6 @@
         if (check.status === 'online') return;
 
         isAlertOpen = true;
-        wasOffline = true;
         updateStatusUI('offline', 'Offline');
         startBackgroundAutoReconnect();
 
@@ -1417,12 +1413,9 @@
 
           try {
             const check = await checkAllConnections();
-
             if (check.status === 'online') {
               stopBackgroundAutoReconnect();
-
               isAlertOpen = false;
-              wasOffline = false;
 
               if (typeof Swal !== 'undefined' && Swal.isVisible()) {
                 Swal.close();
@@ -1436,7 +1429,6 @@
                 socket.connect();
               }
             } else {
-              wasOffline = true;
               updateStatusUI('offline', 'Offline');
             }
           } catch (err) {
@@ -1454,33 +1446,12 @@
         }
       }
 
-      window.addEventListener('online', async function () {
-        const check = await checkAllConnections();
-        if (check.status === 'online') {
-          stopBackgroundAutoReconnect();
-          isAlertOpen = false;
-          wasOffline = false;
-          if (typeof Swal !== 'undefined' && Swal.isVisible()) {
-            Swal.close();
-            const swalContainer = document.querySelector('.swal2-container');
-            if (swalContainer) swalContainer.remove();
-          }
-          handleConnectionRestored();
-        }
-      });
-
-      window.addEventListener('offline', function () {
-        triggerConnectionLostAlert();
-      });
-
       let isRestoring = false;
       function handleConnectionRestored() {
         if (isRestoring) return;
         isRestoring = true;
 
         stopBackgroundAutoReconnect();
-        wasOffline = false;
-
         updateStatusUI('restored', 'Anda kembali online');
 
         const toastEl = document.getElementById('custom-toast');
@@ -1505,7 +1476,7 @@
         }, 3000);
       }
 
-      // --- SOCKET.IO EVENT LISTENERS ---
+      // --- SOCKET.IO EVENT LISTENERS YANG DISESUAIKAN DENGAN API CONTROLLER ---
       function initSocket(token, userId, serverUrl) {
         if (typeof socket !== 'undefined' && socket) {
           socket.disconnect();
@@ -1520,12 +1491,7 @@
         });
 
         socket.on('connect', async () => {
-          const check = await checkAllConnections();
-          if (check.status !== 'online') {
-            triggerConnectionLostAlert();
-            return;
-          }
-
+          console.log('[SOCKET.IO] Terhubung ke WebSocket server pusat.');
           const activeUserId = currentUser && currentUser.id ? currentUser.id : localStorage.getItem('user_id');
           if (activeUserId && activeUserId !== 'undefined') {
             socket.emit('register_user_socket', activeUserId);
@@ -1538,6 +1504,7 @@
         });
 
         socket.on('disconnect', () => {
+          console.log('[SOCKET.IO] Terputus dari WebSocket server.');
           triggerConnectionLostAlert();
         });
 
@@ -1557,47 +1524,48 @@
 
         // --- 1. LIVE CHAT CHANNELS / GROUPS ---
         socket.on('receive_channel_chat', (data) => {
+          console.log('[LIVE CHAT CHANNEL] Pesan diterima:', data);
           displayChannelMessage(data);
         });
 
         // --- 2. LIVE CHAT PRIVATE ---
         socket.on('receive_private_chat', (data) => {
+          console.log('[LIVE CHAT PRIVATE] Pesan masuk:', data);
           displayPrivateMessage(data);
         });
         socket.on('private_chat_message', (data) => {
           displayPrivateMessage(data);
         });
 
-        // --- 3. PTT FLOOR CONTROL & BUSY STATUS ---
+        // --- 3. PTT FLOOR CONTROL & STATUS SIBUK/READY ---
         socket.on('floor_granted', (data) => {
-          console.log('[PTT] Floor diberikan oleh server.');
+          console.log('[PTT] Floor diizinkan oleh server:', data);
         });
 
         socket.on('floor_denied', (data) => {
+          console.log('[PTT] Floor DITOLAK (Busy):', data);
           isTransmittingState = false;
           resetPttUI();
+          handlePeerPTTStatus({ username: 'User Lain', sender_name: 'User Lain', roomId: currentRoomId }, true);
           Swal.fire({
             toast: true,
             position: 'top-end',
             icon: 'warning',
-            title: data.message || 'Channel sedang digunakan (Busy)',
+            title: data.message || 'Channel sedang digunakan (Busy / Transmitting)',
             showConfirmButton: false,
             timer: 2000,
           });
         });
 
-        socket.on('user_started_speaking', (data) => {
-          handlePeerPTTChange(data, true);
-        });
-
         socket.on('user_ptt_broadcast', (data) => {
-          // Tangani berdasarkan flag isTransmitting dari server
+          console.log('[PTT BROADCAST] Status PTT diterima:', data);
           const transmitting = data.isTransmitting === true || data.isTransmitting === 1 || data.isTransmitting === '1';
-          handlePeerPTTChange(data, transmitting);
+          handlePeerPTTStatus(data, transmitting);
         });
 
         socket.on('floor_released', (data) => {
-          handlePeerPTTChange(data, false);
+          console.log('[PTT FLOOR] Floor dilepas (Ready):', data);
+          handlePeerPTTStatus(data, false);
         });
 
         // Event Socket untuk Panggilan Suara Berdering (Ringing)
@@ -1623,9 +1591,14 @@
         });
       }
 
-      // --- LOGIKA PENGUNCIAN PTT & PENCEGAHAN STALE BUSY STATE ---
-      function handlePeerPTTChange(data, isTransmitting) {
-        if (String(data.roomId || data.room_id) === String(currentRoomId)) {
+      // --- HANDLER UPDATE STATUS PTT SIBUK / READY ---
+      function updatePeerPTTStatus(data) {
+        const transmitting = data.isTransmitting === true || data.isTransmitting === 1 || data.isTransmitting === '1';
+        handlePeerPTTStatus(data, transmitting);
+      }
+
+      function handlePeerPTTStatus(data, isTransmitting) {
+        if (String(data.roomId || data.room_id || currentRoomId) === String(currentRoomId)) {
           const activeSpeakerName = document.getElementById('activeSpeakerName');
           const pttIndicator = document.getElementById('pttIndicator');
           const pttBtn = document.getElementById('pttButton');
@@ -1633,18 +1606,18 @@
           const myUserId = currentUser ? String(currentUser.id) : '';
           const peerUserId = String(data.userId || data.sender_id || data.user_id || '');
 
-          // Abaikan jika event broadcast berasal dari diri sendiri
+          // Abaikan jika event broadcast berasal dari perangkat sendiri
           if (peerUserId && myUserId && peerUserId === myUserId) {
             return;
           }
 
           if (isTransmitting) {
-            // User lain sedang berbicara -> Kunci PTT di laptop kita menjadi busy
+            // Status: SIBUK (Busy / On Air)
             if (activeSpeakerName) {
               activeSpeakerName.innerText = data.username || data.sender_name || 'User Lain (On Air)';
             }
             if (pttIndicator) {
-              pttIndicator.innerText = `${(data.username || data.sender_name || 'USER').toUpperCase()} ON AIR (BUSY)`;
+              pttIndicator.innerText = `${(data.username || data.sender_name || 'USER').toUpperCase()} ON AIR (SIBOK / BUSY)`;
               pttIndicator.style.color = '#ef4444';
             }
             if (pttBtn) {
@@ -1654,12 +1627,12 @@
               pttBtn.title = 'Channel sedang digunakan (Busy)';
             }
           } else {
-            // Selesai berbicara / floor dilepas -> Buka kembali PTT ke mode standby
+            // Status: SIAP / READY (Standby)
             if (activeSpeakerName) {
               activeSpeakerName.innerText = 'Belum ada transmisi';
             }
             if (pttIndicator) {
-              pttIndicator.innerText = 'STANDBY';
+              pttIndicator.innerText = 'SIAP (READY)';
               pttIndicator.style.color = '#22c55e';
             }
             if (pttBtn && currentActivationMode === 'Push to Talk') {
@@ -1687,15 +1660,14 @@
         }
         if (pttBtnText) pttBtnText.innerText = 'PTT';
         if (pttIndicator) {
-          pttIndicator.innerText = 'STANDBY';
+          pttIndicator.innerText = 'SIAP (READY)';
           pttIndicator.style.color = '#22c55e';
         }
         if (activeSpeakerName) activeSpeakerName.innerText = 'Belum ada transmisi';
       }
 
-      // --- PEMBARUAN LIVE CHAT: CHANNELS/GROUPS & PRIVATE CHAT ---
+      // --- LIVE CHAT DISPLAY FUNCTIONS ---
       function displayChannelMessage(data) {
-        // Mendukung multi-format kunci dari server (roomId / channel_id)
         const msgRoomId = String(data.roomId || data.channel_id || data.room_id || '');
         if (msgRoomId === String(currentRoomId) && currentViewMode === 'channel') {
           const isMyMessage = currentUser && String(data.userId || data.sender_id) === String(currentUser.id);
@@ -1710,7 +1682,6 @@
         const receiverId = String(data.receiver_id || '');
         const myId = currentUser ? String(currentUser.id) : '';
 
-        // Tampilkan jika percakapan pribadi melibatkan user saat ini dan target yang aktif di layar
         if (currentViewMode === 'private') {
           if (senderId === String(activeTargetUserId) || (senderId === myId && receiverId === String(activeTargetUserId))) {
             const isOutgoing = senderId === myId;
@@ -1728,7 +1699,7 @@
               renderChannelList(res.rooms);
             }
           } catch (e) {
-            console.error('Terjadi kesalahan saat mengambil rooms:', e);
+            console.error('Gagal memuat rooms:', e);
           }
         }
       }
@@ -1739,19 +1710,17 @@
         container.innerHTML = '';
 
         let userCurrentRoom = null;
-        if (currentUser && currentUser.current_room !== undefined && currentUser.current_room !== null && currentUser.current_room !== '') {
+        if (currentUser && currentUser.current_room !== undefined && currentUser.current_room !== null) {
           userCurrentRoom = String(currentUser.current_room).trim();
         }
 
         rooms.forEach((room, index) => {
-          const roomId = String(room.id || room.room_id || room.channel_code || room.room_code || index).trim();
-          const roomName = String(room.name || room.channel_name || room.room_name || room.title || '').trim();
+          const roomId = String(room.id || room.room_id || room.channel_code || index).trim();
+          const roomName = String(room.name || room.channel_name || room.title || '').trim();
 
           let isMatched = false;
           if (userCurrentRoom) {
-            const matchById = roomId === userCurrentRoom;
-            const matchByName = roomName.toLowerCase() === userCurrentRoom.toLowerCase();
-            isMatched = matchById || matchByName;
+            isMatched = roomId === userCurrentRoom || roomName.toLowerCase() === userCurrentRoom.toLowerCase();
           }
 
           const isFirst = index === 0 && !userCurrentRoom;
@@ -1780,16 +1749,16 @@
           let targetRoom = rooms[0];
           if (userCurrentRoom) {
             const found = rooms.find((r) => {
-              const rId = String(r.id || r.room_id || r.channel_code || r.room_code || '').trim();
-              const rName = String(r.name || r.channel_name || r.room_name || r.title || '')
+              const rId = String(r.id || r.room_id || r.channel_code || '').trim();
+              const rName = String(r.name || r.channel_name || r.title || '')
                 .trim()
                 .toLowerCase();
               return rId === userCurrentRoom || rName === userCurrentRoom.toLowerCase();
             });
             if (found) targetRoom = found;
           }
-          const targetId = targetRoom.id || targetRoom.room_id || targetRoom.channel_code || targetRoom.room_code || 0;
-          const targetName = targetRoom.name || targetRoom.channel_name || targetRoom.room_name || targetRoom.title || 'Channel Radio';
+          const targetId = targetRoom.id || targetRoom.room_id || targetRoom.channel_code || 0;
+          const targetName = targetRoom.name || targetRoom.channel_name || targetRoom.title || 'Channel Radio';
           selectChannel(targetId, targetName);
         }
       }
@@ -1815,21 +1784,17 @@
         container.innerHTML = '';
 
         let membersList = members;
-        // Jika server mengembalikan objek bersarang atau format khusus
         if (members && !Array.isArray(members) && members.data) {
           membersList = members.data;
         }
         if (!Array.isArray(membersList)) membersList = [];
 
         const myUserId = currentUser ? String(currentUser.id) : String(localStorage.getItem('user_id') || '');
-        const filteredMembers = membersList.filter((member) => {
-          const mId = String(member.id || member.user_id || '');
-          return mId !== myUserId;
-        });
+        const filteredMembers = membersList.filter((m) => String(m.id || m.user_id || '') !== myUserId);
 
         if (filteredMembers.length === 0) {
           container.innerHTML =
-            '<div style="padding: 10px; font-size: 12px; color: var(--text-muted); text-align: center;">Tidak ada member lain yang online</div>';
+            '<div style="padding: 10px; font-size: 12px; color: var(--text-muted); text-align: center;">Tidak ada member lain online</div>';
           return;
         }
 
@@ -1845,7 +1810,6 @@
             .toUpperCase();
           const avatarColor = colors[index % colors.length];
           const roomBadgeText = member.current_room_name ? member.current_room_name.toUpperCase() : 'ONLINE';
-
           const isSelectedActive = currentViewMode === 'private' && String(activeTargetUserId) === String(memberId) ? 'active' : '';
 
           const rowHtml = `
@@ -1885,9 +1849,7 @@
         currentRoomId = id;
         activeTargetUserId = null;
 
-        if (currentUser) {
-          currentUser.current_room = id;
-        }
+        if (currentUser) currentUser.current_room = id;
 
         document.getElementById('mainHeaderPrefix').innerText = '#';
         document.getElementById('currentChannelTitle').innerText = channelName;
@@ -1909,9 +1871,7 @@
         }
 
         if (window.pywebview && window.pywebview.api.switch_room) {
-          window.pywebview.api.switch_room(id).catch((err) => {
-            console.error('Gagal switch room di backend:', err);
-          });
+          window.pywebview.api.switch_room(id).catch((err) => console.error(err));
         }
 
         await loadChannelChats(id);
@@ -1941,7 +1901,7 @@
         if (!actionsContainer) return;
 
         actionsContainer.innerHTML = `
-          <button class="btn-call" onclick="triggerPrivateVoiceCall('${userId}', '${escapeHtml(userName)}')" title="Private Voice Call (Berdering)">
+          <button class="btn-call" onclick="triggerPrivateVoiceCall('${userId}', '${escapeHtml(userName)}')" title="Private Voice Call">
             <i class="bi bi-telephone-fill"></i>
           </button>
           <button class="btn-send" onclick="sendPrivateMessage('${userId}')" id="sendPrivateBtn" title="Kirim Pesan Pribadi">
@@ -1964,7 +1924,7 @@
       function triggerPrivateVoiceCall(targetUserId, targetName) {
         Swal.fire({
           title: `Memanggil ${targetName}...`,
-          text: `Panggilan suara pribadi sedang berdering ke user tujuan.`,
+          text: `Panggilan suara pribadi sedang berdering.`,
           icon: 'info',
           timer: 5000,
           timerProgressBar: true,
@@ -2016,22 +1976,6 @@
               <span class="bubble-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
           </div>
         `;
-
-        // Integrasi API opsional untuk riwayat private chat jika disediakan backend
-        if (window.pywebview && window.pywebview.api.fetch_private_chats) {
-          try {
-            const res = await window.pywebview.api.fetch_private_chats(targetUserId);
-            if (res.success && res.chats && res.chats.length > 0) {
-              res.chats.forEach((chat) => {
-                const isOutgoing = String(chat.sender_id) === String(currentUser.id);
-                const senderName = isOutgoing ? currentUser.full_name : activeTargetUserName;
-                appendChatMessage(senderName, chat.message, chat.created_at, isOutgoing);
-              });
-            }
-          } catch (e) {
-            console.log('Riwayat private chat belum dimuat atau endpoint belum tersedia.');
-          }
-        }
       }
 
       async function loadChannelChats(roomId) {
@@ -2042,24 +1986,8 @@
           try {
             const res = await window.pywebview.api.fetch_channel_chats(roomId);
             if (res.success && res.chats && res.chats.length > 0) {
-              let lastRenderedDate = '';
               res.chats.forEach((chat) => {
                 const isOutgoing = currentUser && chat.user_id === currentUser.id;
-                const chatDate = new Date(chat.created_at);
-                const dateString = formatDateLabel(chatDate);
-
-                if (dateString !== lastRenderedDate) {
-                  lastRenderedDate = dateString;
-                  const dateDividerHTML = `
-                    <div class="chat-date-divider text-center my-2">
-                        <span class="badge bg-secondary text-light px-3 py-1 rounded-pill" style="font-size: 0.75rem; opacity: 0.8;">
-                            ${dateString}
-                        </span>
-                    </div>
-                  `;
-                  chatContainer.insertAdjacentHTML('beforeend', dateDividerHTML);
-                }
-
                 appendChatMessage(chat.username || chat.sender_name || 'Operator', chat.message, chat.created_at, isOutgoing);
               });
               chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -2075,21 +2003,6 @@
           } catch (e) {
             console.error('Gagal memuat riwayat chat:', e);
           }
-        }
-      }
-
-      function formatDateLabel(dateObj) {
-        const today = new Date();
-        const yesterday = new Date();
-        yesterday.setDate(today.getDate() - 1);
-
-        if (dateObj.toDateString() === today.toDateString()) {
-          return 'Hari Ini';
-        } else if (dateObj.toDateString() === yesterday.toDateString()) {
-          return 'Kemarin';
-        } else {
-          const options = { day: 'numeric', month: 'short', year: 'numeric' };
-          return dateObj.toLocaleDateString('id-ID', options);
         }
       }
 
@@ -2138,9 +2051,7 @@
         }
 
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_mic_muted) {
-          window.pywebview.api.set_mic_muted(isMicMuted).catch((err) => {
-            console.error('Gagal menyinkronkan status mic:', err);
-          });
+          window.pywebview.api.set_mic_muted(isMicMuted).catch((err) => console.error(err));
         }
       }
 
@@ -2159,9 +2070,7 @@
         }
 
         if (window.pywebview && window.pywebview.api && window.pywebview.api.set_speaker_muted) {
-          window.pywebview.api.set_speaker_muted(isDeafened).catch((err) => {
-            console.error('Gagal mengirim status speaker ke backend:', err);
-          });
+          window.pywebview.api.set_speaker_muted(isDeafened).catch((err) => console.error(err));
         }
       }
 
@@ -2172,7 +2081,7 @@
       function showInfo() {
         Swal.fire({
           title: 'ROIP TIK Polda Bali',
-          text: 'Sistem Dispatcher Console berbasis P25 atau ROIP Gateway untuk operasional Kepolisian Daerah Bali.',
+          text: 'Sistem Dispatcher Console berbasis P25 atau ROIP Gateway.',
           icon: 'info',
           confirmButtonText: 'Tutup',
         });
@@ -2190,7 +2099,7 @@
         const text = input.value.trim();
         if (!text || !currentUser) return;
 
-        if (socket) {
+        if (socket && socket.connected) {
           socket.emit('send_channel_chat', {
             roomId: currentRoomId,
             userId: currentUser.id,
@@ -2323,7 +2232,7 @@
           if (userShortcuts.pushToTalk && !userShortcuts.pushToTalk.toLowerCase().includes('mouse')) {
             if (matchesShortcut(e, userShortcuts.pushToTalk)) {
               const pttBtn = document.getElementById('pttButton');
-              if (pttBtn && pttBtn.disabled) return; // Mencegah spasi saat busy
+              if (pttBtn && pttBtn.disabled) return;
 
               if (!isShortcutPressed) {
                 isShortcutPressed = true;
@@ -2364,35 +2273,10 @@
         }
       });
 
-      window.addEventListener('mousedown', (e) => {
-        if (currentActivationMode === 'Push to Talk') {
-          const pttBtn = document.getElementById('pttButton');
-          if (pttBtn && pttBtn.disabled) return;
-
-          if (e.button === 2 && userShortcuts.pushToTalk && userShortcuts.pushToTalk.toLowerCase().includes('mouse')) {
-            startPTT();
-          }
-        }
-      });
-
-      window.addEventListener('mouseup', (e) => {
-        if (currentActivationMode === 'Push to Talk') {
-          if (e.button === 2 && userShortcuts.pushToTalk && userShortcuts.pushToTalk.toLowerCase().includes('mouse')) {
-            stopPTT();
-          }
-        }
-      });
-
-      window.addEventListener('contextmenu', (e) => {
-        if (userShortcuts.pushToTalk && userShortcuts.pushToTalk.toLowerCase().includes('mouse')) {
-          e.preventDefault();
-        }
-      });
-
       function logout() {
         Swal.fire({
           title: 'Putuskan Koneksi?',
-          text: 'Anda akan memutuskan sambungan dan keluar dari sesi aktif konsol dispatching saat ini.',
+          text: 'Anda akan memutuskan sambungan dan keluar dari sesi aktif.',
           icon: 'warning',
           iconColor: '#ef4444',
           showCancelButton: true,
@@ -2400,7 +2284,6 @@
           cancelButtonColor: '#334155',
           confirmButtonText: 'Disconnect',
           cancelButtonText: 'Batal',
-          backdrop: true,
           allowOutsideClick: false,
         }).then(async (result) => {
           if (result.isConfirmed) {
@@ -2409,44 +2292,12 @@
               try {
                 await window.pywebview.api.go_to_login();
               } catch (err) {
-                console.error('Gagal berpindah ke halaman login:', err);
+                console.error(err);
               }
             }
           }
         });
       }
-
-      document.addEventListener('DOMContentLoaded', () => {
-        const titleBar = document.querySelector('.title-bar');
-        if (titleBar) {
-          let isMouseDown = false;
-          let startX = 0;
-          let startY = 0;
-
-          titleBar.addEventListener('mousedown', (e) => {
-            if (e.target.closest('.title-controls') || e.target.closest('.connection-badge')) return;
-            isMouseDown = true;
-            startX = e.clientX;
-            startY = e.clientY;
-          });
-
-          window.addEventListener('mousemove', (e) => {
-            if (!isMouseDown) return;
-            const moveX = Math.abs(e.clientX - startX);
-            const moveY = Math.abs(e.clientY - startY);
-            if (moveX > 5 || moveY > 5) {
-              isMouseDown = false;
-              if (window.pywebview && window.pywebview.api && window.pywebview.api.reset_window_size) {
-                window.pywebview.api.reset_window_size();
-              }
-            }
-          });
-
-          window.addEventListener('mouseup', () => {
-            isMouseDown = false;
-          });
-        }
-      });
     </script>
   </body>
 </html>
