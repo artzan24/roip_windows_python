@@ -1,24 +1,24 @@
 {
-  "inputDevice": "System default",
-  "outputDevice": "System default",
-  "micVolume": "83",
-  "speakerVolume": "100",
-  "activationMode": "Push to Talk",
-  "voiceThreshold": "-40",
-  "hardwareInterface": {
-    "enableHardwarePTT": false,
-    "serialPort": "",
-    "pttPin": "RTS",
-    "baudRate": "9600"
-  },
-  "shortcuts": {
-    "pushToTalk": "SPACE",
-    "toggleMute": "Ctrl+Shift+M",
-    "toggleDeafen": "Ctrl+Shift+D"
-  },
-  "notifications": {
-    "sound": false,
-    "native": true,
-    "welcomeMessage": "Show once"
-  }
+    "inputDevice": "System default",
+    "outputDevice": "System default",
+    "micVolume": "83",
+    "speakerVolume": "100",
+    "activationMode": "Push to Talk",
+    "voiceThreshold": "-37",
+    "hardwareInterface": {
+        "enableHardwarePTT": false,
+        "serialPort": "",
+        "pttPin": "RTS",
+        "baudRate": "9600"
+    },
+    "shortcuts": {
+        "pushToTalk": "SPACE",
+        "toggleMute": "Ctrl+Shift+M",
+        "toggleDeafen": "Ctrl+Shift+D"
+    },
+    "notifications": {
+        "sound": true,
+        "native": true,
+        "welcomeMessage": "Show once"
+    }
 }

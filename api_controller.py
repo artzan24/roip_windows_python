@@ -836,6 +836,40 @@ class RoIPLoginAPI:
         except Exception as e:
             print(f"[AUDIO ERROR] Gagal memulai background recording: {e}")
 
+    def fetch_private_chats(self, target_user_id):
+        if not self.auth_token:
+            return {
+                "success": False,
+                "message": "Token tidak tersedia"
+            }
+        if not self.current_user or not self.current_user.get("id"):
+            return {
+                "success": False,
+                "message": "User belum login"
+            }
+        user_id = self.current_user.get("id")
+        headers = {
+            "Authorization": f"Bearer {self.auth_token}"
+        }
+        try:
+            url = (
+                f"{self.api_base_url}/private-messages/"
+                f"{user_id}/{target_user_id}"
+            )
+            response = requests.get(
+                url,
+                headers=headers,
+                timeout=10
+            )
+            return response.json()
+        except Exception as e:
+            print(f"[PRIVATE CHAT ERROR] {e}")
+
+            return {
+                "success": False,
+                "message": str(e)
+            }
+    
     def fetch_channel_chats(self, room_id):
         if not self.auth_token:
             return {"success": False, "message": "Token tidak tersedia"}

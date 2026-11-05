@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="id">
+
   <head>
     <meta charset="UTF-8" />
     <title>Fancy Mumble - Dispatcher Console</title>
@@ -935,6 +936,22 @@
         text-overflow: ellipsis;
         text-align: center;
       }
+
+      .chat-date-separator {
+        display: flex;
+        justify-content: center;
+        margin: 15px 0;
+        position: relative;
+      }
+
+      .chat-date-separator span {
+        background: #263548;
+        color: #cbd5e1;
+        font-size: 11px;
+        padding: 5px 12px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, .15);
+      }
     </style>
   </head>
 
@@ -954,10 +971,7 @@
         </div>
         <div class="title-controls">
           <!-- Indikator Status Koneksi -->
-          <div
-            id="connection-status-badge"
-            class="connection-badge online"
-            style="display: flex; align-items: center; margin-right: 15px; font-size: 12px; font-weight: 500">
+          <div id="connection-status-badge" class="connection-badge online" style="display: flex; align-items: center; margin-right: 15px; font-size: 12px; font-weight: 500">
             <span id="status-dot" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px"></span>
             <span id="status-text">Online</span>
           </div>
@@ -1076,13 +1090,7 @@
               <div class="chat-input-panel" id="chatInputPanel">
                 <input type="text" class="chat-input-box" id="messageInput" placeholder="Ketik pesan chat..." onkeypress="handleKeyPress(event)" />
                 <div id="inputActionsContainer" style="display: flex; gap: 8px; align-items: center">
-                  <button
-                    class="btn-send"
-                    onclick="sendMessage()"
-                    id="sendBtn"
-                    title="Kirim Pesan"
-                    disabled
-                    style="opacity: 0.5; cursor: not-allowed">
+                  <button class="btn-send" onclick="sendMessage()" id="sendBtn" title="Kirim Pesan" disabled style="opacity: 0.5; cursor: not-allowed">
                     <i class="bi bi-send-fill"></i>
                   </button>
                 </div>
@@ -1096,13 +1104,7 @@
                 <div class="ptt-instruction">Tekan lama atau spasi keyboard untuk berbicara</div>
 
                 <!-- Tombol PTT Bulat -->
-                <button
-                  class="ptt-round-btn"
-                  id="pttButton"
-                  onmousedown="startPTT()"
-                  onmouseup="stopPTT()"
-                  ontouchstart="startPTT()"
-                  ontouchend="stopPTT()"
+                <button class="ptt-round-btn" id="pttButton" onmousedown="startPTT()" onmouseup="stopPTT()" ontouchstart="startPTT()" ontouchend="stopPTT()"
                   title="Tekan atau Spasi untuk Bicara">
                   <i class="bi bi-mic-fill"></i>
                   <span id="pttBtnText">PTT</span>
@@ -1122,9 +1124,7 @@
     </div>
 
     <!-- Elemen Toast Kustom -->
-    <div
-      id="custom-toast"
-      style="
+    <div id="custom-toast" style="
         display: none;
         position: fixed;
         top: 40px;
@@ -1984,17 +1984,118 @@
 
       async function loadPrivateChats(targetUserId) {
         const chatContainer = document.getElementById('chatContainer');
-        chatContainer.innerHTML = `
-          <div class="chat-bubble incoming">
-              <span class="bubble-sender">Sistem Dispatcher</span>
-              <span class="bubble-text">Percakapan pribadi terenkripsi dengan ${escapeHtml(activeTargetUserName)}.</span>
-              <span class="bubble-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-          </div>
-        `;
+        if (!chatContainer || !currentUser || !targetUserId) return;
+        chatContainer.innerHTML = '';
+        try {
+          if (!window.pywebview || !window.pywebview.api.fetch_private_chats) {
+            console.error('[PRIVATE CHAT] API fetch_private_chats tidak tersedia');
+            return;
+          }
+          const res = await window.pywebview.api.fetch_private_chats(targetUserId);
+          console.log('[PRIVATE CHAT HISTORY]', res);
+          if (!res.success) {
+            console.error('[PRIVATE CHAT] Gagal mengambil riwayat:', res.message);
+            return;
+          }
+          const chats = res.chats || [];
+
+          if (chats.length === 0) {
+            chatContainer.innerHTML = `
+                <div class="chat-bubble incoming">
+                    <span class="bubble-sender">Sistem Dispatcher</span>
+                    <span class="bubble-text">
+                        Percakapan pribadi dengan
+                        ${escapeHtml(activeTargetUserName)}.
+                        Belum ada riwayat pesan.
+                    </span>
+                    <span class="bubble-time">
+                        ${new Date().toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+                    </span>
+                </div>
+            `;
+
+            return;
+          }
+
+          let lastDate = '';
+
+          chats.forEach((chat) => {
+            const senderId = String(chat.sender_id);
+            const myId = String(currentUser.id);
+            const isOutgoing = senderId === myId;
+            const messageDate = chat.created_at;
+            // Identifikasi tanggal pesan
+            const date = new Date(messageDate);
+            const currentDate = [
+              date.getFullYear(),
+              String(date.getMonth() + 1).padStart(2, '0'),
+              String(date.getDate()).padStart(2, '0')
+            ].join('-');
+
+            // Tampilkan pemisah tanggal jika tanggal berubah
+            if (currentDate !== lastDate) {
+              appendChatDateSeparator(messageDate);
+              lastDate = currentDate;
+            }
+
+            const senderName = isOutgoing
+              ? currentUser.full_name
+              : (chat.sender_name || activeTargetUserName || 'User');
+
+            appendChatMessage(
+              senderName,
+              chat.message,
+              messageDate,
+              isOutgoing
+            );
+          });
+
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        } catch (e) {
+          console.error('[PRIVATE CHAT] Gagal memuat riwayat:', e);
+        }
+      }
+
+      function formatChatDate(dateValue) {
+        const date = new Date(dateValue);
+        const today = new Date();
+        const yesterday = new Date();
+
+        yesterday.setDate(today.getDate() - 1);
+
+        const isSameDay = (a, b) =>
+          a.getDate() === b.getDate() &&
+          a.getMonth() === b.getMonth() &&
+          a.getFullYear() === b.getFullYear();
+
+        if (isSameDay(date, today)) return 'Hari ini';
+        if (isSameDay(date, yesterday)) return 'Kemarin';
+
+        return date.toLocaleDateString('id-ID', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        });
+      }
+
+      function appendChatDateSeparator(dateValue) {
+        const chatContainer = document.getElementById('chatContainer');
+        const dateLabel = formatChatDate(dateValue);
+
+        const separator = document.createElement('div');
+        separator.className = 'chat-date-separator';
+        separator.innerHTML = `<span>${dateLabel}</span>`;
+
+        chatContainer.appendChild(separator);
       }
 
       async function loadChannelChats(roomId) {
         const chatContainer = document.getElementById('chatContainer');
+        let lastDate = '';
         chatContainer.innerHTML = '';
 
         if (window.pywebview && window.pywebview.api.fetch_channel_chats) {
@@ -2002,8 +2103,24 @@
             const res = await window.pywebview.api.fetch_channel_chats(roomId);
             if (res.success && res.chats && res.chats.length > 0) {
               res.chats.forEach((chat) => {
-                const isOutgoing = currentUser && String(chat.user_id || chat.sender_id) === String(currentUser.id);
-                appendChatMessage(chat.username || chat.sender_name || 'Operator', chat.message, chat.created_at, isOutgoing);
+                const messageDate = chat.created_at;
+                const currentDate = new Date(messageDate).toLocaleDateString('en-CA');
+
+                // Tampilkan tanggal hanya jika berbeda dari pesan sebelumnya
+                if (currentDate !== lastDate) {
+                  appendChatDateSeparator(messageDate);
+                  lastDate = currentDate;
+                }
+
+                const isOutgoing = currentUser &&
+                  String(chat.user_id || chat.sender_id) === String(currentUser.id);
+
+                appendChatMessage(
+                  chat.username || chat.sender_name || 'Operator',
+                  chat.message,
+                  messageDate,
+                  isOutgoing
+                );
               });
               chatContainer.scrollTop = chatContainer.scrollHeight;
             } else {
@@ -2350,4 +2467,5 @@
       }
     </script>
   </body>
+
 </html>
