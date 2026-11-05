@@ -47,6 +47,11 @@ class RoIPLoginAPI:
         self.is_playing_mic_test = False
         self.test_audio_frames = []
 
+        self.ptt_floor_requested = False
+        self.ptt_floor_granted = False
+        self.ptt_cancel_pending = False
+        self.ptt_request_room_id = None
+
         self.mic_volume = 100
         self.speaker_volume = 100
 
@@ -145,15 +150,55 @@ class RoIPLoginAPI:
 
         @self.sio.on('floor_granted')
         def on_floor_granted(data):
-            print(f"[DEBUG LOG - PTT FLOOR] Floor diizinkan oleh server: {data}")
+            print(f"[PTT FLOOR] Floor diberikan: {data}")
+
+            if self.ptt_cancel_pending:
+                print("[PTT FLOOR] Permintaan sudah dibatalkan, melepas floor.")
+
+                self.sio.emit('release_floor', {
+                    'roomId': str(self.ptt_request_room_id or self.current_room_id),
+                    'userId': str((self.current_user or {}).get('id', ''))
+                })
+
+                self.ptt_floor_requested = False
+                self.ptt_floor_granted = False
+                self.ptt_cancel_pending = False
+                self.ptt_request_room_id = None
+                return
+
+            self.ptt_floor_requested = False
+            self.ptt_floor_granted = True
+
+            # Mulai merekam dan mengirim audio setelah floor diberikan
+            self.start_ptt()
+
 
         @self.sio.on('floor_denied')
         def on_floor_denied(data):
-            print(f"[DEBUG LOG - PTT FLOOR] Floor DITOLAK (BUSY) oleh server: {data}")
+            print(f"[PTT FLOOR] Floor ditolak: {data}")
+
+            self.ptt_floor_requested = False
+            self.ptt_floor_granted = False
+            self.ptt_cancel_pending = False
+            self.ptt_request_room_id = None
+
 
         @self.sio.on('floor_released')
         def on_floor_released(data):
-            print(f"[DEBUG LOG - PTT FLOOR] Floor dilepas (READY): {data}")
+            print(f"[PTT FLOOR] Floor dilepaskan: {data}")
+
+            self.ptt_floor_requested = False
+            self.ptt_floor_granted = False
+            self.ptt_cancel_pending = False
+            self.ptt_request_room_id = None
+
+            # Kirim notifikasi penolakan ke frontend
+            if self.window:
+                self.window.evaluate_js(
+                    "window.handleFloorDenied && window.handleFloorDenied("
+                    + json.dumps(data)
+                    + ")"
+                )
 
         @self.sio.on('update_user_connection')
         def on_update_user_connection(data):
@@ -723,6 +768,54 @@ class RoIPLoginAPI:
         self.start_background_recording_if_needed()
         return self.roip_manager.set_active_channel(channel_id)
 
+    def request_floor(self, room_id=None, user_id=None):
+        if not self.sio.connected:
+            return {
+                "success": False,
+                "message": "Socket server belum terhubung"
+            }
+
+        if not self.current_user:
+            return {
+                "success": False,
+                "message": "User belum login"
+            }
+
+        user_id = user_id or self.current_user.get('id')
+        room_id = room_id or self.current_room_id
+
+        if not user_id or not room_id:
+            return {
+                "success": False,
+                "message": "Room ID atau User ID tidak valid"
+            }
+
+        if self.ptt_floor_requested or self.ptt_floor_granted:
+            return {
+                "success": True,
+                "message": "Permintaan floor sedang aktif"
+            }
+
+        self.ptt_floor_requested = True
+        self.ptt_floor_granted = False
+        self.ptt_cancel_pending = False
+        self.ptt_request_room_id = str(room_id)
+
+        payload = {
+            'roomId': str(room_id),
+            'userId': str(user_id),
+            'username': self.current_user.get('fullname', '')
+        }
+
+        print(f"[PTT FLOOR] Meminta floor: {payload}")
+
+        self.sio.emit('request_floor', payload)
+
+        return {
+            "success": True,
+            "message": "Permintaan floor dikirim"
+        }
+
     def start_background_recording_if_needed(self):
         try:
             settings = self.load_settings_from_json()
@@ -809,12 +902,47 @@ class RoIPLoginAPI:
                     pass
 
     def release_ptt(self, room_id=None, user_id=None):
-        print("[DEBUG LOG - PTT] Menghentikan audio stream...")
+        print("[PTT] Menghentikan audio stream...")
+
         with self.audio_lock:
             self.is_recording = False
             self.is_ptt_active = False
-        duration_seconds = max(1, int(time.time() - self.ptt_start_time))
-        return {"success": True, "duration": duration_seconds}
+
+        room_id = room_id or self.ptt_request_room_id or self.current_room_id
+
+        user_id = user_id or (
+            self.current_user.get('id') if self.current_user else None
+        )
+
+        # Jika belum mendapat floor, tandai pembatalan.
+        if self.ptt_floor_requested and not self.ptt_floor_granted:
+            self.ptt_cancel_pending = True
+
+        if self.sio.connected and (
+            self.ptt_floor_requested or self.ptt_floor_granted
+        ):
+            payload = {
+                'roomId': str(room_id),
+                'userId': str(user_id or '')
+            }
+
+            print(f"[PTT FLOOR] Mengirim release_floor: {payload}")
+
+            self.sio.emit('release_floor', payload)
+
+        duration_seconds = max(
+            1,
+            int(time.time() - self.ptt_start_time)
+        )
+
+        self.ptt_floor_requested = False
+        self.ptt_floor_granted = False
+        self.ptt_request_room_id = None
+
+        return {
+            "success": True,
+            "duration": duration_seconds
+        }
 
     def process_incoming_audio_stream(self, raw_audio_data):
         try:

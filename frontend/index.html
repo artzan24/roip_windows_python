@@ -1195,6 +1195,24 @@
         });
       }
 
+      window.handleFloorDenied = function (data) {
+        console.warn('[PTT] Floor ditolak:', data);
+
+        isTransmittingState = false;
+        resetPttUI();
+
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'warning',
+          title: data?.message || 'Channel sedang digunakan (Busy)',
+          showConfirmButton: false,
+          timer: 3000,
+          background: '#0f172a',
+          color: '#f1f5f9',
+        });
+      };
+
       async function loadAppSettings() {
         if (window.pywebview && window.pywebview.api.load_settings_from_json) {
           try {
@@ -1513,25 +1531,6 @@
         });
         socket.on('private_chat_message', (data) => {
           displayPrivateMessage(data);
-        });
-
-        // --- 3. PTT FLOOR CONTROL & STATUS SIBUK/READY (DIPERBAIKI) ---
-        socket.on('floor_granted', async (data) => {
-          console.log('[PTT] FLOOR GRANTED:', data);
-          const myId = String(currentUser?.id || '');
-          const grantedUserId = String(data.userId || data.user_id || '');
-          if (grantedUserId && grantedUserId !== myId) return;
-          if (!isTransmittingState) {
-            socket.emit('release_floor', {
-              roomId: currentRoomId,
-              userId: currentUser ? currentUser.id : 1,
-            });
-            return;
-          }
-          if (window.pywebview?.api?.start_ptt) {
-            const result = await window.pywebview.api.start_ptt();
-            console.log('[PTT] Audio stream dimulai:', result);
-          }
         });
 
         socket.on('floor_denied', (data) => {
@@ -2161,7 +2160,7 @@
       }
 
       // --- PTT START & STOP (DIPERBAIKI DENGAN SWEETALERT & STATUS BUSY) ---
-      function startPTT() {
+      async function startPTT() {
         if (isMicMuted) return;
         if (currentActivationMode !== 'Push to Talk') return;
 
@@ -2200,16 +2199,14 @@
 
         // Kirim request_floor ke server dengan callback response & event handler
         if (socket && socket.connected) {
-          socket.emit(
-            'request_floor',
-            {
-              roomId: currentRoomId,
-              userId: currentUser ? currentUser.id : 1,
-              username: currentUser ? currentUser.full_name : 'Operator',
-            },
-            (response) => {
-              if (response && response.success === false) {
-                console.warn('[PTT] Floor DITOLAK via Callback:', response);
+          // Meminta floor melalui socket Python
+          if (window.pywebview && window.pywebview.api) {
+            try {
+              const result = await window.pywebview.api.request_floor(currentRoomId, currentUser ? currentUser.id : null);
+
+              console.log('[PTT] Request floor:', result);
+
+              if (!result || result.success !== true) {
                 isTransmittingState = false;
                 resetPttUI();
 
@@ -2217,15 +2214,19 @@
                   toast: true,
                   position: 'top-end',
                   icon: 'warning',
-                  title: response.message || 'Channel sedang digunakan (Busy / Transmitting)',
+                  title: result?.message || 'Gagal meminta floor',
                   showConfirmButton: false,
                   timer: 3000,
                   background: '#0f172a',
                   color: '#f1f5f9',
                 });
               }
-            },
-          );
+            } catch (error) {
+              console.error('[PTT] Request floor error:', error);
+              isTransmittingState = false;
+              resetPttUI();
+            }
+          }
         }
       }
 
@@ -2235,13 +2236,6 @@
 
         isTransmittingState = false;
         resetPttUI();
-
-        if (socket && socket.connected) {
-          socket.emit('release_floor', {
-            roomId: currentRoomId,
-            userId: currentUser ? currentUser.id : 1,
-          });
-        }
 
         if (window.pywebview && window.pywebview.api.release_ptt) {
           window.pywebview.api.release_ptt(currentRoomId, currentUser ? currentUser.id : 1);
