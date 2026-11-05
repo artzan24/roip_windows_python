@@ -1,6 +1,5 @@
 <!doctype html>
 <html lang="id">
-
   <head>
     <meta charset="UTF-8" />
     <title>Fancy Mumble - Dispatcher Console</title>
@@ -840,7 +839,9 @@
         background: rgba(0, 0, 0, 0.4) !important;
         backdrop-filter: blur(4px) !important;
         -webkit-backdrop-filter: blur(4px) !important;
-        transition: background-color 0.3s ease, backdrop-filter 0.3s ease !important;
+        transition:
+          background-color 0.3s ease,
+          backdrop-filter 0.3s ease !important;
       }
 
       /* Tambahan kelas utilitas untuk memaksa kontainer transparan saat hendak ditutup otomatis */
@@ -951,11 +952,13 @@
             <i class="bi bi-check-circle" style="color: #22c55e; margin-right: 4px"></i>
             Memuat Sesi...
           </span>
-
         </div>
         <div class="title-controls">
           <!-- Indikator Status Koneksi -->
-          <div id="connection-status-badge" class="connection-badge online" style="display: flex; align-items: center; margin-right: 15px; font-size: 12px; font-weight: 500">
+          <div
+            id="connection-status-badge"
+            class="connection-badge online"
+            style="display: flex; align-items: center; margin-right: 15px; font-size: 12px; font-weight: 500">
             <span id="status-dot" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px"></span>
             <span id="status-text">Online</span>
           </div>
@@ -969,7 +972,6 @@
           <span class="control-close" onclick="window.pywebview.api.close_window()" title="Close">
             <i class="bi bi-x-lg"></i>
           </span>
-
         </div>
       </div>
 
@@ -1001,7 +1003,10 @@
               </div>
 
               <div id="tab-members" class="tab-pane">
-                <div class="list-category" style="color: #16a34a;"><i class="bi bi-person"></i> ONLINE USERS</div>
+                <div class="list-category" style="color: #16a34a">
+                  <i class="bi bi-person"></i>
+                  ONLINE USERS
+                </div>
                 <div id="onlineMembersContainer">
                   <!-- Daftar Member Online (Disesuaikan menyaring user sendiri) -->
                 </div>
@@ -1071,8 +1076,14 @@
               <!-- Panel Input Pesan & Tombol Interaktif (Mendukung Dynamic Private Mode) -->
               <div class="chat-input-panel" id="chatInputPanel">
                 <input type="text" class="chat-input-box" id="messageInput" placeholder="Ketik pesan chat..." onkeypress="handleKeyPress(event)" />
-                <div id="inputActionsContainer" style="display: flex; gap: 8px; align-items: center;">
-                  <button class="btn-send" onclick="sendMessage()" id="sendBtn" title="Kirim Pesan" disabled style="opacity: 0.5; cursor: not-allowed">
+                <div id="inputActionsContainer" style="display: flex; gap: 8px; align-items: center">
+                  <button
+                    class="btn-send"
+                    onclick="sendMessage()"
+                    id="sendBtn"
+                    title="Kirim Pesan"
+                    disabled
+                    style="opacity: 0.5; cursor: not-allowed">
                     <i class="bi bi-send-fill"></i>
                   </button>
                 </div>
@@ -1086,7 +1097,13 @@
                 <div class="ptt-instruction">Tekan lama atau spasi keyboard untuk berbicara</div>
 
                 <!-- Tombol PTT Bulat -->
-                <button class="ptt-round-btn" id="pttButton" onmousedown="startPTT()" onmouseup="stopPTT()" ontouchstart="startPTT()" ontouchend="stopPTT()"
+                <button
+                  class="ptt-round-btn"
+                  id="pttButton"
+                  onmousedown="startPTT()"
+                  onmouseup="stopPTT()"
+                  ontouchstart="startPTT()"
+                  ontouchend="stopPTT()"
                   title="Tekan atau Spasi untuk Bicara">
                   <i class="bi bi-mic-fill"></i>
                   <span id="pttBtnText">PTT</span>
@@ -1106,13 +1123,29 @@
     </div>
 
     <!-- Elemen Toast Kustom -->
-    <div id="custom-toast"
-      style="display: none; position: fixed; top: 40px; right: 20px; z-index: 99999; background-color: #182232; color: #e2e8f0; border: 1px solid rgba(83, 237, 183, 0.3); border-radius: 10px; padding: 10px 15px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5); font-family: inherit; min-width: 280px; transition: opacity 0.3s ease;">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <i class="bi bi-check-circle-fill" style="color: #42f4a1; font-size: 1.2rem;"></i>
+    <div
+      id="custom-toast"
+      style="
+        display: none;
+        position: fixed;
+        top: 40px;
+        right: 20px;
+        z-index: 99999;
+        background-color: #182232;
+        color: #e2e8f0;
+        border: 1px solid rgba(83, 237, 183, 0.3);
+        border-radius: 10px;
+        padding: 10px 15px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+        font-family: inherit;
+        min-width: 280px;
+        transition: opacity 0.3s ease;
+      ">
+      <div style="display: flex; align-items: center; gap: 10px">
+        <i class="bi bi-check-circle-fill" style="color: #42f4a1; font-size: 1.2rem"></i>
         <div>
-          <div style="font-weight: bold; font-size: 0.9rem;">Koneksi Server Pulih!</div>
-          <div style="font-size: 0.8rem; color: #42f4a1;">Berhasil terhubung kembali ke server pusat.</div>
+          <div style="font-weight: bold; font-size: 0.9rem">Koneksi Server Pulih!</div>
+          <div style="font-size: 0.8rem; color: #42f4a1">Berhasil terhubung kembali ke server pusat.</div>
         </div>
       </div>
     </div>
@@ -1292,7 +1325,12 @@
         document.getElementById('loggedInUserName').innerHTML = `
           <i class="bi bi-check-circle" style="color: #22c55e; margin-right: 4px;"></i> ${escapeHtml(user.full_name)} (${user.role.toUpperCase()})
         `;
-        const initials = user.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        const initials = user.full_name
+          .split(' ')
+          .map((n) => n[0])
+          .join('')
+          .substring(0, 2)
+          .toUpperCase();
         document.getElementById('userAvatarInitials').innerHTML = `${initials}<span class="user-avatar-dot"></span>`;
       }
 
@@ -1335,7 +1373,7 @@
           showConfirmButton: false,
           showDenyButton: true,
           denyButtonText: '<i class="bi bi-box-arrow-right"></i> Keluar Aplikasi',
-          denyButtonColor: '#d33'
+          denyButtonColor: '#d33',
         }).then((result) => {
           // Hanya tertutup/keluar jika pengguna benar-benar menekan tombol "Keluar Aplikasi"
           if (result.isDenied) {
@@ -1354,11 +1392,11 @@
 
       function startBackgroundAutoReconnect() {
         if (backgroundCheckInterval) return;
-        console.log("[BACKGROUND_MONITOR] Memulai background auto-reconnect...");
+        console.log('[BACKGROUND_MONITOR] Memulai background auto-reconnect...');
 
         backgroundCheckInterval = setInterval(async () => {
           if (!navigator.onLine) {
-            console.log("[BACKGROUND_MONITOR] Browser offline. Melewati pengecekan.");
+            console.log('[BACKGROUND_MONITOR] Browser offline. Melewati pengecekan.');
             wasOffline = true;
             updateStatusUI('offline', 'Offline');
             return;
@@ -1371,20 +1409,20 @@
           try {
             if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.check_server_status === 'function') {
               const res = await window.pywebview.api.check_server_status();
-              console.log("[BACKGROUND_MONITOR] Server response:", res);
+              console.log('[BACKGROUND_MONITOR] Server response:', res);
               serverConnected = res && res.success === true;
             } else {
               serverConnected = navigator.onLine && socket && socket.connected;
             }
           } catch (err) {
-            console.error("[BACKGROUND_MONITOR] Check error:", err);
+            console.error('[BACKGROUND_MONITOR] Check error:', err);
             serverConnected = false;
           } finally {
             isBackgroundChecking = false;
           }
 
           if (serverConnected) {
-            console.log("[BACKGROUND_MONITOR] Jaringan/Server PULIH!");
+            console.log('[BACKGROUND_MONITOR] Jaringan/Server PULIH!');
             stopBackgroundAutoReconnect();
 
             isServerAlertOpen = false;
@@ -1394,7 +1432,7 @@
             // Tutup SweetAlert2 secara aman
             if (typeof Swal !== 'undefined' && Swal.isVisible()) {
               Swal.close();
-              console.log("[BACKGROUND_MONITOR] SweetAlert berhasil ditutup.");
+              console.log('[BACKGROUND_MONITOR] SweetAlert berhasil ditutup.');
             }
 
             // [PENTING] Panggil fungsi pemulihan secara langsung
@@ -1404,7 +1442,7 @@
               socket.connect();
             }
           } else {
-            console.log("[BACKGROUND_MONITOR] Server masih belum dapat diakses.");
+            console.log('[BACKGROUND_MONITOR] Server masih belum dapat diakses.');
             wasOffline = true;
             updateStatusUI('offline', 'Offline');
           }
@@ -1415,17 +1453,17 @@
         if (backgroundCheckInterval) {
           clearInterval(backgroundCheckInterval);
           backgroundCheckInterval = null;
-          console.log("[BACKGROUND_MONITOR] Background monitor dihentikan.");
+          console.log('[BACKGROUND_MONITOR] Background monitor dihentikan.');
         }
       }
 
       // Listener event online dari browser
       window.addEventListener('online', function () {
-        console.log("[NETWORK] Browser mendeteksi jaringan ONLINE.");
+        console.log('[NETWORK] Browser mendeteksi jaringan ONLINE.');
       });
 
       window.addEventListener('offline', function () {
-        console.log("[NETWORK] Browser mendeteksi jaringan OFFLINE.");
+        console.log('[NETWORK] Browser mendeteksi jaringan OFFLINE.');
         showServerConnectionLostAlert();
       });
 
@@ -1485,7 +1523,7 @@
           showConfirmButton: false,
           showDenyButton: true,
           denyButtonText: '<i class="bi bi-box-arrow-right"></i> Keluar Aplikasi',
-          denyButtonColor: '#d33'
+          denyButtonColor: '#d33',
         }).then((result) => {
           if (result.isDenied) {
             stopBackgroundAutoReconnect();
@@ -1508,7 +1546,7 @@
           auth: { token: token },
           forceNew: true,
           reconnectionAttempts: 3,
-          timeout: 5000
+          timeout: 5000,
         });
 
         socket.on('connect', async () => {
@@ -1563,61 +1601,22 @@
           loadOnlineMembers();
         });
 
-        // Event Socket untuk Private Chat
-        socket.on('private_chat_message', (data) => {
-          if (currentViewMode === 'private' && String(activeTargetUserId) === String(data.sender_id)) {
-            appendChatMessage(data.sender_name, data.message, data.created_at || new Date(), false);
-          }
-        });
-
-        // --- 1. LIVE CHAT CHANNEL ---
+        // --- 1. LIVE CHAT CHANNEL (Sinkron) ---
         socket.on('receive_channel_chat', (data) => {
-          // data biasanya berisi: { roomId, userId, username, message, created_at }
-          // Pastikan pesan berasal dari channel/room yang sedang aktif dilihat
-          if (String(data.roomId) === String(currentRoomId)) {
-            // Cek agar pesan dari diri sendiri tidak tercetak dua kali (karena sudah di-append lokal saat sendMessage)
-            const isMyMessage = currentUser && String(data.userId) === String(currentUser.id);
-            if (!isMyMessage) {
-              appendChatMessage(data.username || 'Operator', data.message, data.created_at || new Date(), false);
-            }
-          }
+          displayChannelMessage(data);
         });
 
-        // --- 2. LIVE CHAT PRIVATE ---
+        // --- 2. LIVE CHAT PRIVATE (Sinkron) ---
         socket.on('receive_private_chat', (data) => {
-          // data biasanya berisi: { sender_id, sender_name, receiver_id, message, created_at }
-          if (currentViewMode === 'private' && String(activeTargetUserId) === String(data.sender_id)) {
-            appendChatMessage(data.sender_name, data.message, data.created_at || new Date(), false);
-          }
+          displayPrivateMessage(data);
+        });
+        socket.on('private_chat_message', (data) => {
+          displayPrivateMessage(data);
         });
 
-        // --- 3. LIVE STATUS PTT / TRANSMISI USER LAIN DI ROOM YANG SAMA ---
+        // --- 3. LIVE STATUS PTT / TRANSMISI USER LAIN ---
         socket.on('user_ptt_broadcast', (data) => {
-          // data biasanya berisi: { roomId, userId, username, isTransmitting }
-          if (String(data.roomId) === String(currentRoomId)) {
-            const activeSpeakerName = document.getElementById('activeSpeakerName');
-            const pttIndicator = document.getElementById('pttIndicator');
-
-            if (data.isTransmitting) {
-              // Jika ada user lain sedang menekan PTT / Bicara
-              if (activeSpeakerName) {
-                activeSpeakerName.innerText = data.username || 'User Lain';
-              }
-              if (pttIndicator) {
-                pttIndicator.innerText = `${(data.username || 'USER').toUpperCase()} ON AIR`;
-                pttIndicator.style.color = '#ef4444'; // Warna Merah (Transmisi aktif)
-              }
-            } else {
-              // Jika user lain selesai bicara / kembali standby
-              if (activeSpeakerName) {
-                activeSpeakerName.innerText = 'Belum ada transmisi';
-              }
-              if (pttIndicator) {
-                pttIndicator.innerText = 'STANDBY';
-                pttIndicator.style.color = '#22c55e'; // Warna Hijau (Standby)
-              }
-            }
-          }
+          updatePeerPTTStatus(data);
         });
 
         // Event Socket untuk Panggilan Suara Berdering (Ringing)
@@ -1631,7 +1630,7 @@
             cancelButtonText: '<i class="bi bi-telephone-x-fill"></i> Tolak',
             confirmButtonColor: '#22c55e',
             cancelButtonColor: '#ef4444',
-            allowOutsideClick: false
+            allowOutsideClick: false,
           }).then((res) => {
             if (res.isConfirmed) {
               socket.emit('accept_voice_call', { caller_id: data.caller_id, receiver_id: currentUser.id });
@@ -1641,6 +1640,48 @@
             }
           });
         });
+      }
+
+      // --- Fungsi Global Jembatan Python / Socket ---
+      function displayChannelMessage(data) {
+        if (String(data.roomId) === String(currentRoomId)) {
+          const isMyMessage = currentUser && String(data.userId || data.sender_id) === String(currentUser.id);
+          if (!isMyMessage) {
+            appendChatMessage(data.username || data.sender_name || 'Operator', data.message, data.created_at || new Date(), false);
+          }
+        }
+      }
+
+      function displayPrivateMessage(data) {
+        const senderId = data.sender_id || data.userId;
+        if (currentViewMode === 'private' && String(activeTargetUserId) === String(senderId)) {
+          appendChatMessage(data.sender_name || data.username || 'User', data.message, data.created_at || new Date(), false);
+        }
+      }
+
+      function updatePeerPTTStatus(data) {
+        if (String(data.roomId) === String(currentRoomId)) {
+          const activeSpeakerName = document.getElementById('activeSpeakerName');
+          const pttIndicator = document.getElementById('pttIndicator');
+
+          if (data.isTransmitting) {
+            if (activeSpeakerName) {
+              activeSpeakerName.innerText = data.username || 'User Lain';
+            }
+            if (pttIndicator) {
+              pttIndicator.innerText = `${(data.username || 'USER').toUpperCase()} ON AIR`;
+              pttIndicator.style.color = '#ef4444'; // Merah
+            }
+          } else {
+            if (activeSpeakerName) {
+              activeSpeakerName.innerText = 'Belum ada transmisi';
+            }
+            if (pttIndicator) {
+              pttIndicator.innerText = 'STANDBY';
+              pttIndicator.style.color = '#22c55e'; // Hijau
+            }
+          }
+        }
       }
 
       async function loadUserRooms() {
@@ -1704,7 +1745,9 @@
           if (userCurrentRoom) {
             const found = rooms.find((r) => {
               const rId = String(r.id || r.room_id || r.channel_code || r.room_code || '').trim();
-              const rName = String(r.name || r.channel_name || r.room_name || r.title || '').trim().toLowerCase();
+              const rName = String(r.name || r.channel_name || r.room_name || r.title || '')
+                .trim()
+                .toLowerCase();
               return rId === userCurrentRoom || rName === userCurrentRoom.toLowerCase();
             });
             if (found) targetRoom = found;
@@ -1737,13 +1780,14 @@
         container.innerHTML = '';
 
         const myUserId = currentUser ? String(currentUser.id) : String(localStorage.getItem('user_id') || '');
-        const filteredMembers = members.filter(member => {
+        const filteredMembers = members.filter((member) => {
           const mId = String(member.id || member.user_id || '');
           return mId !== myUserId;
         });
 
         if (filteredMembers.length === 0) {
-          container.innerHTML = '<div style="padding: 10px; font-size: 12px; color: var(--text-muted); text-align: center;">Tidak ada member lain yang online</div>';
+          container.innerHTML =
+            '<div style="padding: 10px; font-size: 12px; color: var(--text-muted); text-align: center;">Tidak ada member lain yang online</div>';
           return;
         }
 
@@ -1751,11 +1795,16 @@
         filteredMembers.forEach((member, index) => {
           const memberId = member.id || member.user_id;
           const name = member.full_name || member.username || 'User';
-          const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+          const initials = name
+            .split(' ')
+            .map((n) => n[0])
+            .join('')
+            .substring(0, 2)
+            .toUpperCase();
           const avatarColor = colors[index % colors.length];
           const roomBadgeText = member.current_room_name ? member.current_room_name.toUpperCase() : 'ONLINE';
 
-          const isSelectedActive = (currentViewMode === 'private' && String(activeTargetUserId) === String(memberId)) ? 'active' : '';
+          const isSelectedActive = currentViewMode === 'private' && String(activeTargetUserId) === String(memberId) ? 'active' : '';
 
           const rowHtml = `
             <div class="member-row ${isSelectedActive}" id="member-row-${memberId}" onclick="selectPrivateChat('${memberId}', '${escapeHtml(name)}')">
@@ -1776,8 +1825,8 @@
       }
 
       function switchTab(tabName) {
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach((btn) => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach((pane) => pane.classList.remove('active'));
         if (tabName === 'channels') {
           document.querySelector('.sidebar-tabs button:nth-child(1)').classList.add('active');
           document.getElementById('tab-channels').classList.add('active');
@@ -1805,8 +1854,8 @@
         document.getElementById('userChannelBadge').innerText = channelName.toUpperCase();
         document.getElementById('pttActiveChannelBadge').innerText = `# ${channelName.toUpperCase()}`;
 
-        document.querySelectorAll('.channel-row').forEach(row => row.classList.remove('active'));
-        document.querySelectorAll('.member-row').forEach(row => row.classList.remove('active'));
+        document.querySelectorAll('.channel-row').forEach((row) => row.classList.remove('active'));
+        document.querySelectorAll('.member-row').forEach((row) => row.classList.remove('active'));
         const currentRow = document.getElementById(`row-${id}`);
         if (currentRow) currentRow.classList.add('active');
 
@@ -1837,8 +1886,8 @@
         document.getElementById('mainHeaderSub').style.display = 'inline';
         document.getElementById('mainHeaderSub').innerText = '(Private Chat)';
 
-        document.querySelectorAll('.channel-row').forEach(row => row.classList.remove('active'));
-        document.querySelectorAll('.member-row').forEach(row => row.classList.remove('active'));
+        document.querySelectorAll('.channel-row').forEach((row) => row.classList.remove('active'));
+        document.querySelectorAll('.member-row').forEach((row) => row.classList.remove('active'));
         const memRow = document.getElementById(`member-row-${userId}`);
         if (memRow) memRow.classList.add('active');
 
@@ -1886,10 +1935,10 @@
               socket.emit('start_private_voice_call', {
                 caller_id: currentUser.id,
                 caller_name: currentUser.full_name,
-                receiver_id: targetUserId
+                receiver_id: targetUserId,
               });
             }
-          }
+          },
         }).then((result) => {
           if (result.dismiss === Swal.DismissReason.cancel) {
             if (socket && socket.connected) {
@@ -1910,7 +1959,7 @@
             receiver_id: targetUserId,
             sender_id: currentUser.id,
             sender_name: currentUser.full_name,
-            message: text
+            message: text,
           });
         }
         appendChatMessage(currentUser.full_name, text, new Date(), true);
@@ -2309,5 +2358,4 @@
       });
     </script>
   </body>
-
 </html>

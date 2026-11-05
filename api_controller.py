@@ -116,7 +116,6 @@ class RoIPLoginAPI:
                 try:
                     import json
                     safe_data = json.dumps(data)
-                    # Meneruskan data chat ke fungsi JavaScript frontend (misal: displayChannelMessage)
                     self.window.evaluate_js(f"if(typeof displayChannelMessage === 'function') {{ displayChannelMessage({safe_data}); }}")
                 except Exception as e:
                     print("Gagal mengevaluasi JS receive_channel_chat:", e)
@@ -129,22 +128,21 @@ class RoIPLoginAPI:
                 try:
                     import json
                     safe_data = json.dumps(data)
-                    # Meneruskan status PTT/transmisi ke fungsi JavaScript frontend (misal: updatePeerPTTStatus)
                     self.window.evaluate_js(f"if(typeof updatePeerPTTStatus === 'function') {{ updatePeerPTTStatus({safe_data}); }}")
                 except Exception as e:
                     print("Gagal mengevaluasi JS user_ptt_broadcast:", e)
 
-        # Event untuk menerima update status floor dari server pusat
-        @self.sio.on('floor_status_update')
-        def on_floor_status_update(data):
-            print("[FLOOR STATUS] Update floor room diterima:", data)
+        # Event untuk menerima pesan chat pribadi (Private Chat)
+        @self.sio.on('receive_private_chat')
+        def on_receive_private_chat(data):
+            print("[PRIVATE CHAT] Pesan masuk diterima:", data)
             if self.window:
                 try:
                     import json
                     safe_data = json.dumps(data)
-                    self.window.evaluate_js(f"if(typeof updateFloorStatusUI === 'function') {{ updateFloorStatusUI({safe_data}); }}")
+                    self.window.evaluate_js(f"if(typeof displayPrivateMessage === 'function') {{ displayPrivateMessage({safe_data}); }}")
                 except Exception as e:
-                    print("Gagal mengevaluasi JS floor_status_update:", e)
+                    print("Gagal mengevaluasi JS receive_private_chat:", e)
 
         @self.sio.event
         def disconnect():
