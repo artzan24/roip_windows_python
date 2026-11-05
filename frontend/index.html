@@ -2276,16 +2276,23 @@
       }
 
       // --- PTT START & STOP (DIPERBAIKI DENGAN SWEETALERT & STATUS BUSY) ---
+      let pttPressLocked = false;
       async function startPTT() {
-        if (isMicMuted) return;
-        if (currentActivationMode !== 'Push to Talk') return;
+        if (pttPressLocked) return;
+        pttPressLocked = true;
+        if (isMicMuted) {
+          pttPressLocked = false;
+          return;
+        }
+        if (currentActivationMode !== 'Push to Talk') {
+          pttPressLocked = false;
+          return;
+        }
 
         const pttBtn = document.getElementById('pttButton');
         if (pttBtn && pttBtn.disabled) {
           console.warn('[PTT] Tombol terkunci, channel sedang digunakan (Busy).');
           Swal.fire({
-            toast: true,
-            position: 'top-end',
             icon: 'warning',
             title: 'Channel sedang digunakan (Busy / Transmitting)',
             showConfirmButton: false,
@@ -2327,8 +2334,6 @@
                 resetPttUI();
 
                 Swal.fire({
-                  toast: true,
-                  position: 'top-end',
                   icon: 'warning',
                   title: result?.message || 'Gagal meminta floor',
                   showConfirmButton: false,
@@ -2346,15 +2351,24 @@
         }
       }
 
-      function stopPTT() {
+      async function stopPTT() {
         if (currentActivationMode !== 'Push to Talk') return;
         if (!isTransmittingState) return;
 
         isTransmittingState = false;
         resetPttUI();
 
-        if (window.pywebview && window.pywebview.api.release_ptt) {
-          window.pywebview.api.release_ptt(currentRoomId, currentUser ? currentUser.id : 1);
+        try {
+          if (window.pywebview && window.pywebview.api.release_ptt) {
+            await window.pywebview.api.release_ptt(
+              currentRoomId,
+              currentUser ? currentUser.id : 1
+            );
+          }
+        } catch (error) {
+          console.error('[PTT] Gagal release floor:', error);
+        } finally {
+          pttPressLocked = false;
         }
       }
 
