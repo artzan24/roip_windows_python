@@ -1,3 +1,5 @@
+import socket
+
 import webview
 import os
 import json
@@ -171,6 +173,42 @@ class RoIPLoginAPI:
 
     def set_window(self, window):
         self.window = window
+
+    def check_server_status(self):
+        """
+        Mengecek status kesehatan server pusat secara dinamis berdasarkan 
+        IP & Port dari config.json dan melakukan uji koneksi socket aktual.
+        """
+        try:
+            # Muat konfigurasi terbaru dari config.json
+            config = self.load_config()
+            server_ip = config.get("ip_server", "10.18.200.21")
+            server_port = int(config.get("port", 3002))
+
+            # 1. Uji koneksi socket langsung ke server pusat
+            socket.create_connection((server_ip, server_port), timeout=2)
+            return {
+                "success": True, 
+                "message": f"Terhubung ke server pusat {server_ip}:{server_port}"
+            }
+        except OSError:
+            try:
+                # 2. Fallback cadangan: cek koneksi internet umum (Google DNS) jika server pusat belum merespons
+                socket.create_connection(("8.8.8.8", 53), timeout=2)
+                return {
+                    "success": False, 
+                    "error": "Internet online, tetapi server pusat tidak dapat dijangkau"
+                }
+            except OSError:
+                return {
+                    "success": False, 
+                    "error": "Tidak ada koneksi internet / offline"
+                }
+        except Exception as e:
+            return {
+                "success": False, 
+                "error": str(e)
+            }
     
     def close_window(self):
         try:

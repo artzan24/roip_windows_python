@@ -2,23 +2,23 @@
     "inputDevice": "System default",
     "outputDevice": "System default",
     "micVolume": "83",
-    "speakerVolume": "46",
+    "speakerVolume": "100",
     "activationMode": "Push to Talk",
-    "voiceThreshold": "-27",
+    "voiceThreshold": "-40",
     "hardwareInterface": {
         "enableHardwarePTT": false,
-        "serialPort": "COM1",
+        "serialPort": "",
         "pttPin": "RTS",
         "baudRate": "9600"
     },
     "shortcuts": {
-        "pushToTalk": "SPACE",
-        "toggleMute": "Ctrl+M",
-        "toggleDeafen": "Ctrl+D"
+        "pushToTalk": "Ctrl+",
+        "toggleMute": "Ctrl+Shift+M",
+        "toggleDeafen": "Ctrl+Shift+D"
     },
     "notifications": {
-        "sound": true,
+        "sound": false,
         "native": true,
-        "welcomeMessage": "Always"
+        "welcomeMessage": "Show once"
     }
 }
