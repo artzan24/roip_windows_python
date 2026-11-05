@@ -1505,6 +1505,7 @@
         }, 3000);
       }
 
+      // --- SOCKET.IO EVENT LISTENERS ---
       function initSocket(token, userId, serverUrl) {
         if (typeof socket !== 'undefined' && socket) {
           socket.disconnect();
@@ -1590,7 +1591,9 @@
         });
 
         socket.on('user_ptt_broadcast', (data) => {
-          handlePeerPTTChange(data, data.isTransmitting);
+          // Tangani berdasarkan flag isTransmitting dari server
+          const transmitting = data.isTransmitting === true || data.isTransmitting === 1 || data.isTransmitting === '1';
+          handlePeerPTTChange(data, transmitting);
         });
 
         socket.on('floor_released', (data) => {
@@ -1620,17 +1623,23 @@
         });
       }
 
-      // --- LOGIKA PENGUNCIAN PTT JIKA USER LAIN BERBICARA (BUSY) ---
+      // --- LOGIKA PENGUNCIAN PTT & PENCEGAHAN STALE BUSY STATE ---
       function handlePeerPTTChange(data, isTransmitting) {
-        if (String(data.roomId) === String(currentRoomId)) {
+        if (String(data.roomId || data.room_id) === String(currentRoomId)) {
           const activeSpeakerName = document.getElementById('activeSpeakerName');
           const pttIndicator = document.getElementById('pttIndicator');
           const pttBtn = document.getElementById('pttButton');
-          const myUserId = currentUser ? String(currentUser.id) : '';
-          const peerUserId = String(data.userId || data.sender_id || '');
 
-          if (isTransmitting && peerUserId !== myUserId) {
-            // User lain sedang berbicara -> PTT di halaman kita menjadi BUSY dan tidak bisa diklik
+          const myUserId = currentUser ? String(currentUser.id) : '';
+          const peerUserId = String(data.userId || data.sender_id || data.user_id || '');
+
+          // Abaikan jika event broadcast berasal dari diri sendiri
+          if (peerUserId && myUserId && peerUserId === myUserId) {
+            return;
+          }
+
+          if (isTransmitting) {
+            // User lain sedang berbicara -> Kunci PTT di laptop kita menjadi busy
             if (activeSpeakerName) {
               activeSpeakerName.innerText = data.username || data.sender_name || 'User Lain (On Air)';
             }
@@ -1644,8 +1653,8 @@
               pttBtn.disabled = true;
               pttBtn.title = 'Channel sedang digunakan (Busy)';
             }
-          } else if (!isTransmitting) {
-            // Selesai berbicara -> PTT kembali standby dan bisa digunakan
+          } else {
+            // Selesai berbicara / floor dilepas -> Buka kembali PTT ke mode standby
             if (activeSpeakerName) {
               activeSpeakerName.innerText = 'Belum ada transmisi';
             }
@@ -1664,6 +1673,7 @@
       }
 
       function resetPttUI() {
+        isTransmittingState = false;
         const pttBtn = document.getElementById('pttButton');
         const pttBtnText = document.getElementById('pttBtnText');
         const pttIndicator = document.getElementById('pttIndicator');
@@ -2224,7 +2234,7 @@
         return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       }
 
-      // --- PTT START & STOP DENGAN FLOOR CONTROL & BUSY GUARD ---
+      // --- PTT START & STOP ---
       function startPTT() {
         if (isMicMuted) return;
         if (currentActivationMode !== 'Push to Talk') return;
@@ -2236,7 +2246,8 @@
         }
 
         isTransmittingState = true;
-        pttBtn.classList.add('active');
+        if (pttBtn) pttBtn.classList.add('active');
+
         const pttBtnText = document.getElementById('pttBtnText');
         const pttIndicator = document.getElementById('pttIndicator');
         const activeSpeakerName = document.getElementById('activeSpeakerName');
