@@ -1519,17 +1519,9 @@
           displayChannelMessage(data);
         });
 
-        // Menambahkan listener alternatif nama event chat dari berbagai variasi backend
-        socket.on('channel_chat_message', (data) => {
-          displayChannelMessage(data);
-        });
-
-        // --- 2. LIVE CHAT PRIVATE ---
+        // --- LIVE CHAT PRIVATE ---
         socket.on('receive_private_chat', (data) => {
           console.log('[LIVE CHAT PRIVATE] Pesan masuk:', data);
-          displayPrivateMessage(data);
-        });
-        socket.on('private_chat_message', (data) => {
           displayPrivateMessage(data);
         });
 
@@ -1685,16 +1677,18 @@
       }
 
       function displayPrivateMessage(data) {
-        const senderId = String(data.sender_id || data.userId || '');
-        const receiverId = String(data.receiver_id || '');
-        const myId = currentUser ? String(currentUser.id) : '';
+        const senderId = String(data.senderId || data.sender_id || data.userId || '');
+        const receiverId = String(data.receiverId || data.receiver_id || '');
+        const myId = String(currentUser?.id || '');
 
-        if (currentViewMode === 'private') {
-          if (senderId === String(activeTargetUserId) || (senderId === myId && receiverId === String(activeTargetUserId))) {
-            const isOutgoing = senderId === myId;
-            const senderName = isOutgoing ? (currentUser ? currentUser.full_name : 'Saya') : activeTargetUserName || 'User';
-            appendChatMessage(senderName, data.message, data.created_at || new Date(), isOutgoing);
-          }
+        if (currentViewMode !== 'private') return;
+
+        if (senderId === String(activeTargetUserId) || (senderId === myId && receiverId === String(activeTargetUserId))) {
+          const isOutgoing = senderId === myId;
+
+          const senderName = isOutgoing ? currentUser?.full_name || 'Saya' : data.senderName || data.sender_name || activeTargetUserName || 'User';
+
+          appendChatMessage(senderName, data.message, data.createdAt || data.created_at || new Date(), isOutgoing);
         }
       }
 
@@ -1968,18 +1962,23 @@
 
       function sendPrivateMessage(targetUserId) {
         const input = document.getElementById('messageInput');
-        const text = input.value.trim();
-        if (!text || !currentUser) return;
+        const message = input.value.trim();
 
-        if (socket && socket.connected) {
-          socket.emit('send_private_chat', {
-            receiver_id: targetUserId,
-            sender_id: currentUser.id,
-            sender_name: currentUser.full_name,
-            message: text,
-          });
+        if (!message || !currentUser) return;
+
+        if (!socket || !socket.connected) {
+          console.error('[CHAT PRIVATE] Socket tidak terhubung');
+          return;
         }
-        appendChatMessage(currentUser.full_name, text, new Date(), true);
+
+        socket.emit('send_private_chat', {
+          senderId: currentUser.id,
+          receiverId: targetUserId,
+          senderName: currentUser.full_name,
+          message: message,
+        });
+
+        appendChatMessage(currentUser.full_name, message, new Date(), true);
         input.value = '';
       }
 
