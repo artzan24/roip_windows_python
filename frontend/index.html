@@ -844,14 +844,13 @@
           backdrop-filter 0.3s ease !important;
       }
 
-      /* Tambahan kelas utilitas untuk memaksa kontainer transparan saat hendak ditutup otomatis */
       .swal2-container.swal2-fadeOut {
         background: transparent !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
       }
 
-      /* Styling untuk List Member Online (Dibuat bisa diklik untuk Private Chat) */
+      /* Styling untuk List Member Online */
       .member-row {
         display: flex;
         align-items: center;
@@ -1008,7 +1007,7 @@
                   ONLINE USERS
                 </div>
                 <div id="onlineMembersContainer">
-                  <!-- Daftar Member Online (Disesuaikan menyaring user sendiri) -->
+                  <!-- Daftar Member Online -->
                 </div>
               </div>
             </div>
@@ -1073,7 +1072,7 @@
                 </div>
               </div>
 
-              <!-- Panel Input Pesan & Tombol Interaktif (Mendukung Dynamic Private Mode) -->
+              <!-- Panel Input Pesan -->
               <div class="chat-input-panel" id="chatInputPanel">
                 <input type="text" class="chat-input-box" id="messageInput" placeholder="Ketik pesan chat..." onkeypress="handleKeyPress(event)" />
                 <div id="inputActionsContainer" style="display: flex; gap: 8px; align-items: center">
@@ -1168,11 +1167,13 @@
       let activeTargetUserId = null;
       let activeTargetUserName = null;
 
-      let currentActivationMode = 'Voice Activation';
+      let currentActivationMode = 'Push to Talk';
+      let isTransmittingState = false; // Status lokal PTT
+
       let userShortcuts = {
-        pushToTalk: 'Mouse 2 (Right)',
-        toggleMute: 'Ctrl+A',
-        toggleDeafen: 'Ctrl+J',
+        pushToTalk: 'SPACE',
+        toggleMute: 'Ctrl+Shift+M',
+        toggleDeafen: 'Ctrl+Shift+D',
       };
 
       const messageInput = document.getElementById('messageInput');
@@ -1334,13 +1335,11 @@
         document.getElementById('userAvatarInitials').innerHTML = `${initials}<span class="user-avatar-dot"></span>`;
       }
 
-      // --- MANAJEMEN STATUS KONEKSI & UI BADGE (OTOMATIS) ---
+      // --- MANAJEMEN STATUS KONEKSI & UI BADGE (TERPADU & ANTI DOBEL) ---
       let wasOffline = false;
-      let isServerAlertOpen = false;
-      let isInternetAlertOpen = false;
+      let isAlertOpen = false; // Flag tunggal untuk mencegah SweetAlert ganda
       let backgroundCheckInterval = null;
 
-      // Fungsi helper untuk mengubah status badge via class CSS
       function updateStatusUI(state, text) {
         const badgeElement = document.getElementById('connection-status-badge');
         const statusText = document.getElementById('status-text');
@@ -1352,22 +1351,47 @@
         statusText.innerText = text;
       }
 
-      // Dipanggil saat server lokal terputus
-      function showServerConnectionLostAlert() {
-        // Jika alert sudah terbuka, jangan buat dobel
-        if (isServerAlertOpen) return;
+      // Fungsi validasi gabungan Internet & Server Lokal
+      async function checkAllConnections() {
+        if (!navigator.onLine) {
+          return { status: 'offline', title: 'Koneksi Internet Terputus', message: 'Akses internet terdeteksi terganggu.' };
+        }
 
+        let serverConnected = false;
+        try {
+          if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.check_server_status === 'function') {
+            const res = await window.pywebview.api.check_server_status();
+            serverConnected = res && res.success === true;
+          } else {
+            serverConnected = socket && socket.connected;
+          }
+        } catch (err) {
+          serverConnected = false;
+        }
+
+        if (!serverConnected) {
+          return { status: 'server_down', title: 'Koneksi Server Lokal Terputus!', message: 'Tidak dapat terhubung ke server pusat.' };
+        }
+
+        return { status: 'online', title: 'Terhubung', message: 'Semua sistem normal.' };
+      }
+
+      // Menampilkan satu SweetAlert tunggal yang paling akurat
+      async function triggerConnectionLostAlert() {
+        if (isAlertOpen) return;
+
+        const check = await checkAllConnections();
+        if (check.status === 'online') return;
+
+        isAlertOpen = true;
         wasOffline = true;
-        isServerAlertOpen = true;
         updateStatusUI('offline', 'Offline');
-
-        // Mulai pengawasan otomatis di latar belakang
         startBackgroundAutoReconnect();
 
         Swal.fire({
-          icon: 'warning',
-          title: 'Koneksi Server Lokal Terputus!',
-          html: `Tidak dapat terhubung ke server pusat.<br>Mencoba menghubungkan ulang secara otomatis...<br><br><small style="color: #38bdf8;">Alert akan tertutup otomatis saat jaringan pulih.</small>`,
+          icon: check.status === 'offline' ? 'info' : 'warning',
+          title: check.title,
+          html: `${check.message}<br>Mencoba menghubungkan ulang secara otomatis...<br><br><small style="color: #38bdf8;">Alert akan tertutup otomatis saat jaringan pulih.</small>`,
           allowOutsideClick: false,
           allowEscapeKey: false,
           showConfirmButton: false,
@@ -1375,7 +1399,6 @@
           denyButtonText: '<i class="bi bi-box-arrow-right"></i> Keluar Aplikasi',
           denyButtonColor: '#d33',
         }).then((result) => {
-          // Hanya tertutup/keluar jika pengguna benar-benar menekan tombol "Keluar Aplikasi"
           if (result.isDenied) {
             stopBackgroundAutoReconnect();
             if (window.pywebview && window.pywebview.api && window.pywebview.api.close_window) {
@@ -1387,64 +1410,46 @@
         });
       }
 
-      // 3. Background Auto-Reconnect (Mendeteksi pemulihan server)
       let isBackgroundChecking = false;
 
       function startBackgroundAutoReconnect() {
         if (backgroundCheckInterval) return;
-        console.log('[BACKGROUND_MONITOR] Memulai background auto-reconnect...');
+        console.log('[BACKGROUND_MONITOR] Memulai background auto-reconnect gabungan...');
 
         backgroundCheckInterval = setInterval(async () => {
-          if (!navigator.onLine) {
-            console.log('[BACKGROUND_MONITOR] Browser offline. Melewati pengecekan.');
-            wasOffline = true;
-            updateStatusUI('offline', 'Offline');
-            return;
-          }
-
           if (isBackgroundChecking) return;
           isBackgroundChecking = true;
-          let serverConnected = false;
 
           try {
-            if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.check_server_status === 'function') {
-              const res = await window.pywebview.api.check_server_status();
-              console.log('[BACKGROUND_MONITOR] Server response:', res);
-              serverConnected = res && res.success === true;
+            const check = await checkAllConnections();
+
+            if (check.status === 'online') {
+              console.log('[BACKGROUND_MONITOR] Jaringan & Server PULIH!');
+              stopBackgroundAutoReconnect();
+
+              isAlertOpen = false;
+              wasOffline = false;
+
+              // Tutup SweetAlert2 secara aman & bersihkan backdrop
+              if (typeof Swal !== 'undefined' && Swal.isVisible()) {
+                Swal.close();
+                const swalContainer = document.querySelector('.swal2-container');
+                if (swalContainer) swalContainer.remove();
+              }
+
+              handleConnectionRestored();
+
+              if (typeof socket !== 'undefined' && socket && !socket.connected) {
+                socket.connect();
+              }
             } else {
-              serverConnected = navigator.onLine && socket && socket.connected;
+              wasOffline = true;
+              updateStatusUI('offline', 'Offline');
             }
           } catch (err) {
             console.error('[BACKGROUND_MONITOR] Check error:', err);
-            serverConnected = false;
           } finally {
             isBackgroundChecking = false;
-          }
-
-          if (serverConnected) {
-            console.log('[BACKGROUND_MONITOR] Jaringan/Server PULIH!');
-            stopBackgroundAutoReconnect();
-
-            isServerAlertOpen = false;
-            isInternetAlertOpen = false;
-            wasOffline = false; // Tandai sudah tidak offline
-
-            // Tutup SweetAlert2 secara aman
-            if (typeof Swal !== 'undefined' && Swal.isVisible()) {
-              Swal.close();
-              console.log('[BACKGROUND_MONITOR] SweetAlert berhasil ditutup.');
-            }
-
-            // [PENTING] Panggil fungsi pemulihan secara langsung
-            handleConnectionRestored();
-
-            if (typeof socket !== 'undefined' && socket && !socket.connected) {
-              socket.connect();
-            }
-          } else {
-            console.log('[BACKGROUND_MONITOR] Server masih belum dapat diakses.');
-            wasOffline = true;
-            updateStatusUI('offline', 'Offline');
           }
         }, 4000);
       }
@@ -1457,35 +1462,42 @@
         }
       }
 
-      // Listener event online dari browser
-      window.addEventListener('online', function () {
+      window.addEventListener('online', async function () {
         console.log('[NETWORK] Browser mendeteksi jaringan ONLINE.');
+        const check = await checkAllConnections();
+        if (check.status === 'online') {
+          stopBackgroundAutoReconnect();
+          isAlertOpen = false;
+          wasOffline = false;
+          if (typeof Swal !== 'undefined' && Swal.isVisible()) {
+            Swal.close();
+            const swalContainer = document.querySelector('.swal2-container');
+            if (swalContainer) swalContainer.remove();
+          }
+          handleConnectionRestored();
+        }
       });
 
       window.addEventListener('offline', function () {
         console.log('[NETWORK] Browser mendeteksi jaringan OFFLINE.');
-        showServerConnectionLostAlert();
+        triggerConnectionLostAlert();
       });
 
-      let isRestoring = false; // Flag pengaman agar tidak terpanggil dobel
-      // Dipanggil otomatis saat koneksi server pulih / kembali online
+      let isRestoring = false;
       function handleConnectionRestored() {
-        if (isRestoring) return; // Jika sedang proses pemulihan, abaikan pemanggilan berikutnya
+        if (isRestoring) return;
         isRestoring = true;
 
         stopBackgroundAutoReconnect();
         wasOffline = false;
 
-        // Tahap 1: Tampilkan teks "Anda kembali online" pada badge (Warna Kuning/Restored)
         updateStatusUI('restored', 'Anda kembali online');
 
-        // Tampilkan Custom Toast kustom di pojok kanan atas (Hanya sekali)
         const toastEl = document.getElementById('custom-toast');
         if (toastEl) {
           toastEl.style.display = 'block';
           toastEl.style.opacity = '1';
 
-          // Otomatis sembunyikan setelah 3 detik
           setTimeout(() => {
             toastEl.style.opacity = '0';
             setTimeout(() => {
@@ -1494,46 +1506,13 @@
           }, 3000);
         }
 
-        // Tahap 2: Setelah 3 detik, kembalikan status badge menjadi "Online" penuh (Warna Hijau)
         setTimeout(() => {
           const badgeElement = document.getElementById('connection-status-badge');
           if (badgeElement && !badgeElement.classList.contains('offline')) {
             updateStatusUI('online', 'Online');
           }
-          isRestoring = false; // Reset flag setelah proses selesai sepenuhnya
+          isRestoring = false;
         }, 3000);
-      }
-
-      // Fungsi Peringatan jika Koneksi Internet Terputus
-      function showInternetConnectionLostAlert() {
-        if (isInternetAlertOpen) return;
-
-        wasOffline = true;
-        isInternetAlertOpen = true;
-        updateStatusUI('offline', 'Offline');
-
-        startBackgroundAutoReconnect();
-
-        Swal.fire({
-          icon: 'info',
-          title: 'Koneksi Internet Terputus',
-          html: `Akses internet terdeteksi terganggu.<br>Mencoba menghubungkan ulang secara otomatis...<br><br><small style="color: #38bdf8;">Alert akan tertutup otomatis saat internet pulih.</small>`,
-          allowOutsideClick: false,
-          allowEscapeKey: false,
-          showConfirmButton: false,
-          showDenyButton: true,
-          denyButtonText: '<i class="bi bi-box-arrow-right"></i> Keluar Aplikasi',
-          denyButtonColor: '#d33',
-        }).then((result) => {
-          if (result.isDenied) {
-            stopBackgroundAutoReconnect();
-            if (window.pywebview && window.pywebview.api && window.pywebview.api.close_window) {
-              window.pywebview.api.close_window();
-            } else {
-              window.close();
-            }
-          }
-        });
       }
 
       function initSocket(token, userId, serverUrl) {
@@ -1550,25 +1529,9 @@
         });
 
         socket.on('connect', async () => {
-          // Validasi ketat mutlak: Set default ke FALSE, hanya jadi TRUE jika API sukses
-          let verified = false;
-          if (window.pywebview && window.pywebview.api.check_server_status) {
-            try {
-              const res = await window.pywebview.api.check_server_status();
-              if (res && res.success === true) {
-                verified = true;
-              }
-            } catch (e) {
-              verified = false;
-            }
-          } else {
-            // Fallback jika bukan lingkungan pywebview
-            verified = socket.connected;
-          }
-
-          if (!verified) {
-            // Jika socket connect semu tetapi server lokal sebenarnya masih mati, paksa offline
-            showServerConnectionLostAlert();
+          const check = await checkAllConnections();
+          if (check.status !== 'online') {
+            triggerConnectionLostAlert();
             return;
           }
 
@@ -1584,11 +1547,11 @@
         });
 
         socket.on('disconnect', () => {
-          showServerConnectionLostAlert();
+          triggerConnectionLostAlert();
         });
 
         socket.on('connect_error', () => {
-          showServerConnectionLostAlert();
+          triggerConnectionLostAlert();
         });
 
         socket.on('update_user_connection', () => {
@@ -1601,12 +1564,12 @@
           loadOnlineMembers();
         });
 
-        // --- 1. LIVE CHAT CHANNEL (Sinkron) ---
+        // --- 1. LIVE CHAT CHANNEL ---
         socket.on('receive_channel_chat', (data) => {
           displayChannelMessage(data);
         });
 
-        // --- 2. LIVE CHAT PRIVATE (Sinkron) ---
+        // --- 2. LIVE CHAT PRIVATE ---
         socket.on('receive_private_chat', (data) => {
           displayPrivateMessage(data);
         });
@@ -1614,9 +1577,35 @@
           displayPrivateMessage(data);
         });
 
-        // --- 3. LIVE STATUS PTT / TRANSMISI USER LAIN ---
+        // --- 3. PTT FLOOR CONTROL & BROADCAST USER LAIN ---
+        socket.on('floor_granted', (data) => {
+          console.log('[PTT] Floor diberikan oleh server.');
+        });
+
+        socket.on('floor_denied', (data) => {
+          console.warn('[PTT] Floor ditolak:', data.message);
+          isTransmittingState = false;
+          resetPttUI();
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'warning',
+            title: data.message || 'Channel sedang digunakan',
+            showConfirmButton: false,
+            timer: 2000,
+          });
+        });
+
+        socket.on('user_started_speaking', (data) => {
+          handlePeerPTTChange(data, true);
+        });
+
         socket.on('user_ptt_broadcast', (data) => {
-          updatePeerPTTStatus(data);
+          handlePeerPTTChange(data, data.isTransmitting);
+        });
+
+        socket.on('floor_released', (data) => {
+          handlePeerPTTChange(data, false);
         });
 
         // Event Socket untuk Panggilan Suara Berdering (Ringing)
@@ -1642,7 +1631,60 @@
         });
       }
 
-      // --- Fungsi Global Jembatan Python / Socket ---
+      // --- FUNGSI MANAJEMEN STATUS PTT PEER & PENGUNCIAN TOMBOL ---
+      function handlePeerPTTChange(data, isTransmitting) {
+        if (String(data.roomId) === String(currentRoomId)) {
+          const activeSpeakerName = document.getElementById('activeSpeakerName');
+          const pttIndicator = document.getElementById('pttIndicator');
+          const pttBtn = document.getElementById('pttButton');
+          const myUserId = currentUser ? String(currentUser.id) : '';
+          const peerUserId = String(data.userId || '');
+
+          if (isTransmitting && peerUserId !== myUserId) {
+            if (activeSpeakerName) {
+              activeSpeakerName.innerText = data.username || 'User Lain (On Air)';
+            }
+            if (pttIndicator) {
+              pttIndicator.innerText = `${(data.username || 'USER').toUpperCase()} ON AIR`;
+              pttIndicator.style.color = '#ef4444';
+            }
+            if (pttBtn) {
+              pttBtn.style.opacity = '0.4';
+              pttBtn.style.cursor = 'not-allowed';
+              pttBtn.disabled = true;
+            }
+          } else if (!isTransmitting) {
+            if (activeSpeakerName) {
+              activeSpeakerName.innerText = 'Belum ada transmisi';
+            }
+            if (pttIndicator) {
+              pttIndicator.innerText = 'STANDBY';
+              pttIndicator.style.color = '#22c55e';
+            }
+            if (pttBtn && currentActivationMode === 'Push to Talk') {
+              pttBtn.style.opacity = '1';
+              pttBtn.style.cursor = 'pointer';
+              pttBtn.disabled = false;
+            }
+          }
+        }
+      }
+
+      function resetPttUI() {
+        const pttBtn = document.getElementById('pttButton');
+        const pttBtnText = document.getElementById('pttBtnText');
+        const pttIndicator = document.getElementById('pttIndicator');
+        const activeSpeakerName = document.getElementById('activeSpeakerName');
+
+        if (pttBtn) pttBtn.classList.remove('active');
+        if (pttBtnText) pttBtnText.innerText = 'PTT';
+        if (pttIndicator) {
+          pttIndicator.innerText = 'STANDBY';
+          pttIndicator.style.color = '#22c55e';
+        }
+        if (activeSpeakerName) activeSpeakerName.innerText = 'Belum ada transmisi';
+      }
+
       function displayChannelMessage(data) {
         if (String(data.roomId) === String(currentRoomId)) {
           const isMyMessage = currentUser && String(data.userId || data.sender_id) === String(currentUser.id);
@@ -1656,31 +1698,6 @@
         const senderId = data.sender_id || data.userId;
         if (currentViewMode === 'private' && String(activeTargetUserId) === String(senderId)) {
           appendChatMessage(data.sender_name || data.username || 'User', data.message, data.created_at || new Date(), false);
-        }
-      }
-
-      function updatePeerPTTStatus(data) {
-        if (String(data.roomId) === String(currentRoomId)) {
-          const activeSpeakerName = document.getElementById('activeSpeakerName');
-          const pttIndicator = document.getElementById('pttIndicator');
-
-          if (data.isTransmitting) {
-            if (activeSpeakerName) {
-              activeSpeakerName.innerText = data.username || 'User Lain';
-            }
-            if (pttIndicator) {
-              pttIndicator.innerText = `${(data.username || 'USER').toUpperCase()} ON AIR`;
-              pttIndicator.style.color = '#ef4444'; // Merah
-            }
-          } else {
-            if (activeSpeakerName) {
-              activeSpeakerName.innerText = 'Belum ada transmisi';
-            }
-            if (pttIndicator) {
-              pttIndicator.innerText = 'STANDBY';
-              pttIndicator.style.color = '#22c55e'; // Hijau
-            }
-          }
         }
       }
 
@@ -1773,7 +1790,6 @@
         }
       }
 
-      // Render Online Users dengan penyaringan agar tidak menampilkan user sendiri
       function renderOnlineMembers(members) {
         const container = document.getElementById('onlineMembersContainer');
         if (!container) return;
@@ -1875,7 +1891,6 @@
         await loadChannelChats(id);
       }
 
-      // Handler Klik User untuk Private Chat & Voice Call
       function selectPrivateChat(userId, userName) {
         currentViewMode = 'private';
         activeTargetUserId = userId;
@@ -2101,7 +2116,7 @@
           icon.className = 'bi bi-headphones';
         }
 
-        if (window.pywebview && window.pywebview.api.set_speaker_muted) {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_speaker_muted) {
           window.pywebview.api.set_speaker_muted(isDeafened).catch((err) => {
             console.error('Gagal mengirim status speaker ke backend:', err);
           });
@@ -2175,21 +2190,42 @@
         return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       }
 
-      const pttBtn = document.getElementById('pttButton');
-      const pttIndicator = document.getElementById('pttIndicator');
-      const pttBtnText = document.getElementById('pttBtnText');
-      const activeSpeakerName = document.getElementById('activeSpeakerName');
-
+      // --- PTT START & STOP DENGAN FLOOR CONTROL ---
       function startPTT() {
         if (isMicMuted) return;
         if (currentActivationMode !== 'Push to Talk') return;
 
-        pttBtn.classList.add('active');
-        if (pttBtnText) pttBtnText.innerText = 'ON AIR';
-        pttIndicator.innerText = 'TRANSMISI ON AIR';
-        pttIndicator.style.color = '#ef4444';
+        const pttBtn = document.getElementById('pttButton');
+        if (pttBtn && pttBtn.disabled) {
+          console.warn('[PTT] Tombol terkunci, channel sedang digunakan.');
+          return;
+        }
 
-        if (currentUser) activeSpeakerName.innerText = currentUser.full_name;
+        isTransmittingState = true;
+        pttBtn.classList.add('active');
+        const pttBtnText = document.getElementById('pttBtnText');
+        const pttIndicator = document.getElementById('pttIndicator');
+        const activeSpeakerName = document.getElementById('activeSpeakerName');
+
+        if (pttBtnText) pttBtnText.innerText = 'ON AIR';
+        if (pttIndicator) {
+          pttIndicator.innerText = 'TRANSMISI ON AIR';
+          pttIndicator.style.color = '#ef4444';
+        }
+
+        if (currentUser && activeSpeakerName) {
+          activeSpeakerName.innerText = currentUser.full_name;
+        }
+
+        // Emit permintaan floor ke server socket.io Node.js
+        if (socket && socket.connected) {
+          socket.emit('request_floor', {
+            roomId: currentRoomId,
+            userId: currentUser ? currentUser.id : 1,
+            username: currentUser ? currentUser.full_name : 'Operator',
+          });
+        }
+
         if (window.pywebview && window.pywebview.api.start_ptt) {
           window.pywebview.api.start_ptt();
         }
@@ -2197,12 +2233,18 @@
 
       function stopPTT() {
         if (currentActivationMode !== 'Push to Talk') return;
+        if (!isTransmittingState) return;
 
-        pttBtn.classList.remove('active');
-        if (pttBtnText) pttBtnText.innerText = 'PTT';
-        pttIndicator.innerText = 'STANDBY';
-        pttIndicator.style.color = '#22c55e';
-        activeSpeakerName.innerText = 'Belum ada transmisi';
+        isTransmittingState = false;
+        resetPttUI();
+
+        // Emit pelepasan floor ke server socket.io Node.js
+        if (socket && socket.connected) {
+          socket.emit('release_floor', {
+            roomId: currentRoomId,
+            userId: currentUser ? currentUser.id : 1,
+          });
+        }
 
         if (window.pywebview && window.pywebview.api.release_ptt) {
           window.pywebview.api.release_ptt(currentRoomId, currentUser ? currentUser.id : 1);
