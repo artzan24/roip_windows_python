@@ -1570,6 +1570,56 @@
           }
         });
 
+        // --- 1. LIVE CHAT CHANNEL ---
+        socket.on('receive_channel_chat', (data) => {
+          // data biasanya berisi: { roomId, userId, username, message, created_at }
+          // Pastikan pesan berasal dari channel/room yang sedang aktif dilihat
+          if (String(data.roomId) === String(currentRoomId)) {
+            // Cek agar pesan dari diri sendiri tidak tercetak dua kali (karena sudah di-append lokal saat sendMessage)
+            const isMyMessage = currentUser && String(data.userId) === String(currentUser.id);
+            if (!isMyMessage) {
+              appendChatMessage(data.username || 'Operator', data.message, data.created_at || new Date(), false);
+            }
+          }
+        });
+
+        // --- 2. LIVE CHAT PRIVATE ---
+        socket.on('receive_private_chat', (data) => {
+          // data biasanya berisi: { sender_id, sender_name, receiver_id, message, created_at }
+          if (currentViewMode === 'private' && String(activeTargetUserId) === String(data.sender_id)) {
+            appendChatMessage(data.sender_name, data.message, data.created_at || new Date(), false);
+          }
+        });
+
+        // --- 3. LIVE STATUS PTT / TRANSMISI USER LAIN DI ROOM YANG SAMA ---
+        socket.on('user_ptt_broadcast', (data) => {
+          // data biasanya berisi: { roomId, userId, username, isTransmitting }
+          if (String(data.roomId) === String(currentRoomId)) {
+            const activeSpeakerName = document.getElementById('activeSpeakerName');
+            const pttIndicator = document.getElementById('pttIndicator');
+
+            if (data.isTransmitting) {
+              // Jika ada user lain sedang menekan PTT / Bicara
+              if (activeSpeakerName) {
+                activeSpeakerName.innerText = data.username || 'User Lain';
+              }
+              if (pttIndicator) {
+                pttIndicator.innerText = `${(data.username || 'USER').toUpperCase()} ON AIR`;
+                pttIndicator.style.color = '#ef4444'; // Warna Merah (Transmisi aktif)
+              }
+            } else {
+              // Jika user lain selesai bicara / kembali standby
+              if (activeSpeakerName) {
+                activeSpeakerName.innerText = 'Belum ada transmisi';
+              }
+              if (pttIndicator) {
+                pttIndicator.innerText = 'STANDBY';
+                pttIndicator.style.color = '#22c55e'; // Warna Hijau (Standby)
+              }
+            }
+          }
+        });
+
         // Event Socket untuk Panggilan Suara Berdering (Ringing)
         socket.on('incoming_voice_call', (data) => {
           Swal.fire({

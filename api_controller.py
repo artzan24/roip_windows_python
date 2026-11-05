@@ -331,7 +331,7 @@ class RoIPLoginAPI:
             "outputDevice": "System default",
             "micVolume": "100",
             "speakerVolume": "100",
-            "activationMode": "Voice Activation",
+            "activationMode": "Push to Talk",
             "voiceThreshold": "-40",
             "hardwareInterface": {
                 "enableHardwarePTT": False,
@@ -340,7 +340,7 @@ class RoIPLoginAPI:
                 "baudRate": "9600"
             },
             "shortcuts": {
-                "pushToTalk": "Ctrl+",
+                "pushToTalk": "SPACE",
                 "toggleMute": "Ctrl+Shift+M",
                 "toggleDeafen": "Ctrl+Shift+D"
             },
