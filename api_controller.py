@@ -108,6 +108,44 @@ class RoIPLoginAPI:
                 self.sio.emit('register_user_socket', user_id)
                 print(f"[SOCKET.IO] Mengirim event register_user_socket untuk User ID: {user_id}")
 
+        # Event untuk menerima pesan chat channel
+        @self.sio.on('receive_channel_chat')
+        def on_receive_channel_chat(data):
+            print("[CHANNEL CHAT] Pesan channel diterima:", data)
+            if self.window:
+                try:
+                    import json
+                    safe_data = json.dumps(data)
+                    # Meneruskan data chat ke fungsi JavaScript frontend (misal: displayChannelMessage)
+                    self.window.evaluate_js(f"if(typeof displayChannelMessage === 'function') {{ displayChannelMessage({safe_data}); }}")
+                except Exception as e:
+                    print("Gagal mengevaluasi JS receive_channel_chat:", e)
+
+        # Event untuk menerima status PTT/transmisi dari user lain
+        @self.sio.on('user_ptt_broadcast')
+        def on_user_ptt_broadcast(data):
+            print("[PTT BROADCAST] Status PTT user lain diterima:", data)
+            if self.window:
+                try:
+                    import json
+                    safe_data = json.dumps(data)
+                    # Meneruskan status PTT/transmisi ke fungsi JavaScript frontend (misal: updatePeerPTTStatus)
+                    self.window.evaluate_js(f"if(typeof updatePeerPTTStatus === 'function') {{ updatePeerPTTStatus({safe_data}); }}")
+                except Exception as e:
+                    print("Gagal mengevaluasi JS user_ptt_broadcast:", e)
+
+        # Event untuk menerima update status floor dari server pusat
+        @self.sio.on('floor_status_update')
+        def on_floor_status_update(data):
+            print("[FLOOR STATUS] Update floor room diterima:", data)
+            if self.window:
+                try:
+                    import json
+                    safe_data = json.dumps(data)
+                    self.window.evaluate_js(f"if(typeof updateFloorStatusUI === 'function') {{ updateFloorStatusUI({safe_data}); }}")
+                except Exception as e:
+                    print("Gagal mengevaluasi JS floor_status_update:", e)
+
         @self.sio.event
         def disconnect():
             print("[SOCKET.IO] Terputus dari WebSocket server pusat.")
