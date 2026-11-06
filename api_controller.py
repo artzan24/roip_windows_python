@@ -46,6 +46,14 @@ class RoIPLoginAPI:
         self.is_recording_mic_test = False
         self.is_playing_mic_test = False
         self.test_audio_frames = []
+        self.is_voice_activity_monitoring = False
+        self.voice_monitor_thread = None
+        self.vad_silence_since = None
+        self.vad_last_request_at = 0.0
+        self.vad_floor_requested = False
+        self.vad_floor_granted = False
+        self.vad_hangover_seconds = 0.7
+        self._resume_stream_after_mic_test = False
 
         self.ptt_floor_requested = False
         self.ptt_floor_granted = False
@@ -150,8 +158,14 @@ class RoIPLoginAPI:
             self.ptt_floor_requested = False
             self.ptt_floor_granted = True
 
-            # Mulai merekam dan mengirim audio setelah floor diberikan
-            self.start_ptt()
+            current_mode = self.load_settings_from_json().get("activationMode", "Push to Talk")
+            if current_mode == "Voice Activation":
+                self.vad_floor_requested = False
+                self.vad_floor_granted = True
+                print("[VAD] Floor diberikan; audio akan dikirim dari stream VAD yang aktif.")
+            else:
+                # Mekanisme PTT manual tetap seperti semula.
+                self.start_ptt()
 
 
         @self.sio.on('floor_denied')
@@ -162,6 +176,9 @@ class RoIPLoginAPI:
             self.ptt_floor_granted = False
             self.ptt_cancel_pending = False
             self.ptt_request_room_id = None
+            self.vad_floor_requested = False
+            self.vad_floor_granted = False
+            self.vad_last_request_at = time.time()
 
             if self.window:
                 try:
@@ -182,6 +199,9 @@ class RoIPLoginAPI:
             self.ptt_floor_granted = False
             self.ptt_cancel_pending = False
             self.ptt_request_room_id = None
+            self.vad_floor_requested = False
+            self.vad_floor_granted = False
+            self.vad_silence_since = None
 
             # Beri tahu frontend bahwa channel sudah READY
             if self.window:
@@ -556,15 +576,75 @@ class RoIPLoginAPI:
         self.is_playing_speaker_test = False
         return {"success": True}
 
+    def _get_audio_level(self, data):
+        """Menghitung level audio dalam persen dan dB."""
+        samples = np.frombuffer(data, dtype=np.int16).astype(np.float32)
+
+        if samples.size == 0:
+            return 0, -60.0
+
+        rms = float(np.sqrt(np.mean(samples ** 2)))
+        db = 20 * np.log10(max(rms / 32768.0, 1e-6))
+
+        # Konversi rentang -60 sampai 0 dB menjadi 0 sampai 100%.
+        percent = int(np.clip((db + 60) / 60 * 100, 0, 100))
+
+        return percent, round(float(db), 1)
+
+    def _send_mic_meter(self, data, mic_name=None):
+        """Kirim level dB aktual ke meter Audio dan indikator VAD."""
+        if not self.window:
+            return
+        try:
+            percent, db = self._get_audio_level(data)
+            settings = self.load_settings_from_json()
+            threshold = float(settings.get("voiceThreshold", -40))
+            is_passing = db >= threshold
+            safe_name = json.dumps(mic_name or settings.get("inputDevice", "System default"))
+            self.window.evaluate_js(
+                f"window.updateMicMeter && window.updateMicMeter({percent}, {db}, {threshold}, {str(is_passing).lower()})"
+            )
+            self.window.evaluate_js(
+                "window.updateVoiceActivityMonitorUI && "
+                f"window.updateVoiceActivityMonitorUI({safe_name}, {db}, {str(is_passing).lower()})"
+            )
+        except Exception as e:
+            print(f"[MIC METER ERROR] {e}")
+
+    def update_voice_threshold(self, threshold):
+        """Simpan threshold VAD agar slider langsung berlaku pada stream aktif."""
+        try:
+            threshold = max(-60.0, min(0.0, float(threshold)))
+            settings = self.load_settings_from_json()
+            settings["voiceThreshold"] = str(threshold)
+            self.save_settings_to_json(settings)
+            return {"success": True, "threshold": threshold}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
     def start_mic_test_record(self, input_device_name=None):
         try:
+            if self.is_ptt_active or self.ptt_floor_requested or self.ptt_floor_granted:
+                return {"success": False, "message": "PTT sedang aktif atau sedang meminta floor. Lepaskan PTT terlebih dahulu sebelum test microphone."}
+            self._resume_stream_after_mic_test = bool(self.is_recording and self.load_settings_from_json().get("activationMode") in ("Voice Activation", "Continuous"))
+            if self.is_recording:
+                self.is_recording = False
+                if self.recording_thread and self.recording_thread.is_alive():
+                    self.recording_thread.join(timeout=1.5)
+            if self.is_voice_activity_monitoring and self.voice_monitor_thread and self.voice_monitor_thread.is_alive():
+                return {"success": False, "message": "Monitor VAD sedang aktif. Tutup tab Voice terlebih dahulu sebelum test microphone."}
             self.stop_audio_test()
             self.is_recording_mic_test = True
             self.test_audio_frames = []
-            input_index = self._get_device_index(input_device_name, is_output=False)
+
+            input_index = self._get_device_index(
+                input_device_name,
+                is_output=False
+            )
 
             def record_worker():
                 stream_in = None
+
                 try:
                     stream_in = self.pyaudio_instance.open(
                         format=self.FORMAT,
@@ -574,31 +654,166 @@ class RoIPLoginAPI:
                         input_device_index=input_index,
                         frames_per_buffer=self.CHUNK
                     )
-                    while getattr(self, 'is_recording_mic_test', False):
-                        data = stream_in.read(self.CHUNK, exception_on_overflow=False)
+
+                    print(f"[MIC TEST] Recording dimulai: {input_device_name}")
+
+                    while self.is_recording_mic_test:
+                        data = stream_in.read(
+                            self.CHUNK,
+                            exception_on_overflow=False
+                        )
+
+                        audio_data = np.frombuffer(
+                            data,
+                            dtype=np.int16
+                        ).astype(np.float32)
+
                         mic_scale = float(self.mic_volume) / 100.0
-                        audio_data = np.frombuffer(data, dtype=np.int16).astype(np.float32)
-                        scaled_audio_chunk = audio_data * mic_scale
-                        processed_data = np.clip(scaled_audio_chunk, -32768, 32767).astype(np.int16).tobytes()
-                        
+                        processed = np.clip(
+                            audio_data * mic_scale,
+                            -32768,
+                            32767
+                        ).astype(np.int16).tobytes()
+
                         with self.audio_lock:
-                            self.test_audio_frames.append(processed_data)
+                            self.test_audio_frames.append(processed)
+
+                        # Meter menggunakan audio asli sebelum pengaturan volume.
+                        self._send_mic_meter(data, input_device_name)
+
                 except Exception as e:
                     print(f"[MIC RECORD ERROR] {e}")
+
+                    if self.window:
+                        self.window.evaluate_js(
+                            "window.updateMicMeter && window.updateMicMeter(0, -60, -40, false)"
+                        )
+
                 finally:
                     if stream_in:
                         try:
                             stream_in.stop_stream()
                             stream_in.close()
-                        except:
+                        except Exception:
                             pass
 
-            self.mic_test_thread = threading.Thread(target=record_worker)
-            self.mic_test_thread.daemon = True
+                    self.is_recording_mic_test = False
+                    if self._resume_stream_after_mic_test:
+                        self._resume_stream_after_mic_test = False
+                        self.start_background_recording_if_needed()
+
+            self.mic_test_thread = threading.Thread(
+                target=record_worker,
+                daemon=True
+            )
             self.mic_test_thread.start()
+
             return {"success": True}
+
         except Exception as e:
+            self.is_recording_mic_test = False
+            print(f"[MIC TEST ERROR] {e}")
             return {"success": False, "message": str(e)}
+
+    def start_voice_activity_monitor(self):
+        try:
+            self.is_voice_activity_monitoring = True
+            # Jika stream audio utama sedang aktif,
+            # pengukuran dilakukan dari stream tersebut.
+            if self.is_recording:
+                return {
+                    "success": True,
+                    "message": "Menggunakan audio stream aktif"
+                }
+            if (
+                self.voice_monitor_thread
+                and self.voice_monitor_thread.is_alive()
+            ):
+                return {"success": True}
+
+            settings = self.load_settings_from_json()
+            input_device_name = settings.get(
+                "inputDevice",
+                "System default"
+            )
+            input_index = self._get_device_index(
+                input_device_name,
+                is_output=False
+            )
+
+            def monitor_worker():
+                stream = None
+                try:
+                    stream = self.pyaudio_instance.open(
+                        format=self.FORMAT,
+                        channels=self.CHANNELS,
+                        rate=self.RATE,
+                        input=True,
+                        input_device_index=input_index,
+                        frames_per_buffer=self.CHUNK
+                    )
+                    print("[VOICE ACTIVITY] Monitor dimulai")
+                    while (
+                        self.is_voice_activity_monitoring
+                        and not self.is_recording
+                    ):
+                        data = stream.read(
+                            self.CHUNK,
+                            exception_on_overflow=False
+                        )
+                        percent, db = self._get_audio_level(data)
+                        threshold = float(
+                            self.load_settings_from_json().get("voiceThreshold", -40)
+                        )
+                        is_passing = db >= threshold
+                        if self.window:
+                            payload = {
+                                "micName": input_device_name,
+                                "dbValue": db,
+                                "isPassing": is_passing
+                            }
+                            self.window.evaluate_js(
+                                "window.updateVoiceActivityMonitorUI && "
+                                f"window.updateVoiceActivityMonitorUI("
+                                f"{json.dumps(payload['micName'])}, "
+                                f"{payload['dbValue']}, "
+                                f"{str(payload['isPassing']).lower()}"
+                                f")"
+                            )
+                except Exception as e:
+                    print(f"[VOICE ACTIVITY ERROR] {e}")
+                finally:
+                    if stream:
+                        try:
+                            stream.stop_stream()
+                            stream.close()
+                        except Exception:
+                            pass
+                    print("[VOICE ACTIVITY] Monitor berhenti")
+
+            self.voice_monitor_thread = threading.Thread(
+                target=monitor_worker,
+                daemon=True
+            )
+            self.voice_monitor_thread.start()
+            return {"success": True}
+
+        except Exception as e:
+            self.is_voice_activity_monitoring = False
+            print(f"[VOICE ACTIVITY START ERROR] {e}")
+            return {"success": False, "message": str(e)}
+
+
+    def stop_voice_activity_monitor(self):
+        self.is_voice_activity_monitoring = False
+
+        if (
+            self.voice_monitor_thread
+            and self.voice_monitor_thread.is_alive()
+        ):
+            self.voice_monitor_thread.join(timeout=0.5)
+
+        return {"success": True}
 
     def stop_mic_test_and_playback(self, output_device_name=None):
         try:
@@ -800,7 +1015,12 @@ class RoIPLoginAPI:
         payload = {
             'roomId': str(room_id),
             'userId': str(user_id),
-            'username': self.current_user.get('fullname', '')
+            'username': (
+                self.current_user.get('full_name')
+                or self.current_user.get('fullname')
+                or self.current_user.get('username')
+                or 'Unknown User'
+            )
         }
 
         print(f"[PTT FLOOR] Meminta floor: {payload}")
@@ -810,6 +1030,28 @@ class RoIPLoginAPI:
         return {
             "success": True,
             "message": "Permintaan floor dikirim"
+        }
+
+    def set_activation_mode(self, mode_name):
+        allowed_modes = [
+            "Push to Talk",
+            "Voice Activation",
+            "Continuous"
+        ]
+
+        if mode_name not in allowed_modes:
+            return {
+                "success": False,
+                "message": "Mode tidak valid"
+            }
+
+        settings = self.load_settings_from_json()
+        settings["activationMode"] = mode_name
+        self.save_settings_to_json(settings)
+
+        return {
+            "success": True,
+            "mode": mode_name
         }
 
     def start_background_recording_if_needed(self):
@@ -896,7 +1138,6 @@ class RoIPLoginAPI:
             settings = self.load_settings_from_json()
             input_device_name = settings.get("inputDevice", "System default")
             input_index = self._get_device_index(input_device_name, is_output=False)
-            
             stream = self.pyaudio_instance.open(
                 format=self.FORMAT,
                 channels=self.CHANNELS,
@@ -905,22 +1146,86 @@ class RoIPLoginAPI:
                 input_device_index=input_index,
                 frames_per_buffer=self.CHUNK
             )
-            
+
             while getattr(self, 'is_recording', False):
                 try:
                     data = stream.read(self.CHUNK, exception_on_overflow=False)
-                except Exception:
+                except Exception as e:
+                    print(f"[AUDIO READ ERROR] {e}")
+                    continue
+                if not data:
                     continue
 
-                if not data or not self.sio.connected or getattr(self, 'is_mic_muted', False):
+                settings = self.load_settings_from_json()
+                mode = settings.get("activationMode", "Push to Talk")
+                threshold = float(settings.get("voiceThreshold", -40))
+                percent, db = self._get_audio_level(data)
+                is_passing = db >= threshold
+
+                # Meter dB selalu mengukur sinyal mic asli, sebelum micVolume.
+                if self.window and (self.is_voice_activity_monitoring or mode in ["Voice Activation", "Continuous"] or self.is_ptt_active):
+                    try:
+                        self._send_mic_meter(data, input_device_name)
+                    except Exception as e:
+                        print(f"[VOICE METER ERROR] {e}")
+
+                if not self.sio.connected or getattr(self, 'is_mic_muted', False):
+                    continue
+
+                # Voice Activation: minta floor saat suara melewati threshold,
+                # lalu lepaskan setelah senyap stabil (hangover 700 ms).
+                if mode == "Voice Activation":
+                    if is_passing:
+                        self.vad_silence_since = None
+                        if (not self.vad_floor_requested and not self.vad_floor_granted
+                                and not self.ptt_floor_requested and not self.ptt_floor_granted
+                                and time.time() - self.vad_last_request_at >= 1.5):
+                            user_id = (self.current_user or {}).get("id")
+                            room_id = self.current_room_id
+                            if user_id and room_id:
+                                self.ptt_floor_requested = True
+                                self.vad_floor_requested = True
+                                self.vad_last_request_at = time.time()
+                                self.ptt_request_room_id = str(room_id)
+                                self.sio.emit('request_floor', {
+                                    'roomId': str(room_id),
+                                    'userId': str(user_id),
+                                    'username': (self.current_user or {}).get('fullname', '')
+                                })
+                                print(f"[VAD] Meminta floor room={room_id}")
+                    else:
+                        if self.vad_floor_granted:
+                            if self.vad_silence_since is None:
+                                self.vad_silence_since = time.time()
+                            elif time.time() - self.vad_silence_since >= self.vad_hangover_seconds:
+                                user_id = (self.current_user or {}).get("id")
+                                room_id = self.ptt_request_room_id or self.current_room_id
+                                self.sio.emit('release_floor', {
+                                    'roomId': str(room_id),
+                                    'userId': str(user_id or '')
+                                })
+                                self.vad_floor_granted = False
+                                self.vad_floor_requested = False
+                                self.ptt_floor_granted = False
+                                self.ptt_floor_requested = False
+                                self.ptt_request_room_id = None
+                                self.vad_silence_since = None
+                                print("[VAD] Senyap terdeteksi; floor dilepaskan")
+                    should_transmit = self.vad_floor_granted
+                elif mode == "Continuous":
+                    should_transmit = True
+                else:
+                    # PTT manual hanya mengirim setelah server memberikan floor.
+                    should_transmit = self.is_ptt_active and self.ptt_floor_granted
+
+                if not should_transmit:
                     continue
 
                 mic_scale = float(self.mic_volume) / 100.0
                 audio_chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32)
-                scaled_audio_chunk = audio_chunk * mic_scale
-                processed_data = np.clip(scaled_audio_chunk, -32768, 32767).astype(np.int16).tobytes()
-                
+                processed_data = np.clip(audio_chunk * mic_scale, -32768, 32767).astype(np.int16).tobytes()
                 self.sio.emit('audio_stream', processed_data)
+
         except Exception as e:
             print(f"[ERROR PyAudio Stream] {e}")
         finally:
@@ -928,7 +1233,7 @@ class RoIPLoginAPI:
                 try:
                     stream.stop_stream()
                     stream.close()
-                except:
+                except Exception:
                     pass
 
     def release_ptt(self, room_id=None, user_id=None):

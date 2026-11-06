@@ -669,7 +669,19 @@
                   </div>
                 </div>
                 <!-- Teks status kecil di bawah tombol ala Zoom -->
-                <div id="micStatusText" style="font-size: 11px; color: var(--text-secondary, #666); margin-top: 4px; min-height: 16px"></div>
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-top: 4px;
+                    font-size: 11px;
+                    color: var(--text-muted);
+                  ">
+                  <span id="micStatusText">Level microphone</span>
+                  <strong id="micDbValue" style="color: var(--accent-blue)">-60.0 dB</strong>
+                </div>
+                <div id="micThresholdStatus" style="font-size: 11px; color: var(--text-muted); margin-top: 3px">Threshold VAD: -40 dB</div>
 
                 <div class="slider-container" style="margin-top: 12px">
                   <span>Microphone Volume</span>
@@ -745,7 +757,7 @@
                 </div>
                 <div style="font-size: 11px; color: var(--text-secondary, #666); margin-top: 4px; min-height: 16px"></div>
 
-                <div class="slider-container" style="margin-top: 12px">
+                <div class="slider-container" style="margin-top: 35px">
                   <span>Speaker Volume</span>
                   <span id="speakerVolText" style="color: var(--accent-blue); font-weight: 600">100%</span>
                 </div>
@@ -803,15 +815,7 @@
                 <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px">
                   Geser slider ke kiri agar lebih sensitif (suara pelan langsung aktif), atau ke kanan agar lebih senyap.
                 </div>
-                <input
-                  type="range"
-                  class="settings-slider"
-                  id="voiceThreshold"
-                  min="-60"
-                  max="0"
-                  value="-40"
-                  oninput="updateSliderLabel('voiceThreshold', 'thresholdVolText', ' dB')"
-                  onchange="saveSettingsData()" />
+                <input type="range" class="settings-slider" id="voiceThreshold" min="-60" max="0" value="-40" oninput="updateVoiceThreshold()" />
 
                 <!-- Indikator Real-time untuk Voice Activity (Meteran Hijau/Merah) -->
                 <div style="margin-top: 12px">
@@ -1165,27 +1169,32 @@
       let isInitializing = true; // Status penanda sedang memuat awal
 
       // Fungsi untuk berpindah antar Tab secara instan tanpa reload halaman
-      function switchSettingsTab(tabName, element) {
-        document.querySelectorAll('.nav-item').forEach((btn) => btn.classList.remove('active'));
-        document.querySelectorAll('.settings-tab-pane').forEach((pane) => pane.classList.remove('active'));
+      async function switchSettingsTab(tabName, element) {
+        document.querySelectorAll('.nav-item').forEach((btn) => {
+          btn.classList.remove('active');
+        });
 
-        element.classList.add('active');
+        document.querySelectorAll('.settings-tab-pane').forEach((pane) => {
+          pane.classList.remove('active');
+        });
+        if (element) element.classList.add('active');
+
         const targetTab = document.getElementById(`tab-${tabName}`);
-        if (targetTab) {
-          targetTab.classList.add('active');
-        }
+        if (targetTab) targetTab.classList.add('active');
 
-        // Panggil monitor Python saat tab Voice aktif atau matikan jika pindah tab
-        if (window.pywebview && window.pywebview.api) {
+        if (!window.pywebview || !window.pywebview.api) return;
+
+        try {
           if (tabName === 'voice') {
-            if (typeof window.pywebview.api.start_voice_activity_monitor === 'function') {
-              window.pywebview.api.start_voice_activity_monitor();
+            const result = await window.pywebview.api.start_voice_activity_monitor();
+            if (result && result.success === false) {
+              console.error('[VOICE MONITOR]', result.message);
             }
           } else {
-            if (typeof window.pywebview.api.stop_voice_activity_monitor === 'function') {
-              window.pywebview.api.stop_voice_activity_monitor();
-            }
+            await window.pywebview.api.stop_voice_activity_monitor();
           }
+        } catch (error) {
+          console.error('[VOICE MONITOR ERROR]', error);
         }
       }
 
@@ -1307,21 +1316,17 @@
       function setActivationMode(modeName) {
         currentActivationMode = modeName;
         document.querySelectorAll('.activation-card').forEach((card) => card.classList.remove('active'));
-
-        // Sembunyikan atau tampilkan pengaturan khusus Voice Activity
         const vaSettings = document.getElementById('voiceActivitySettings');
-        if (vaSettings) {
-          vaSettings.style.display = modeName === 'Voice Activation' ? 'flex' : 'none';
-        }
-
-        if (modeName === 'Voice Activation') document.getElementById('mode-voice').classList.add('active');
-        if (modeName === 'Continuous') document.getElementById('mode-continuous').classList.add('active');
-        if (modeName === 'Push to Talk') document.getElementById('mode-ptt').classList.add('active');
-
+        if (vaSettings) vaSettings.style.display = modeName === 'Voice Activation' ? 'flex' : 'none';
+        const activeCard = modeName === 'Voice Activation' ? 'mode-voice' : modeName === 'Continuous' ? 'mode-continuous' : 'mode-ptt';
+        document.getElementById(activeCard)?.classList.add('active');
         saveSettingsData();
+        if (window.pywebview?.api?.set_activation_mode) {
+          window.pywebview.api.set_activation_mode(modeName);
+        }
       }
 
-      function updateVoiceActivityMonitorUI(micName, dbValue, isPassing) {
+      window.updateVoiceActivityMonitorUI = function (micName, dbValue, isPassing) {
         // Update nama mic di panel log aktif
         const micLabel = document.getElementById('activeMicNameLabel');
         if (micLabel) micLabel.innerText = micName;
@@ -1334,7 +1339,7 @@
 
         // Panggil fungsi penggerak bar meteran
         updateVoiceActivityIndicator(dbValue, isPassing);
-      }
+      };
 
       function updateVoiceActivityIndicator(dbValue, isPassing) {
         const meterContainer = document.getElementById('voiceActivityMeter');
@@ -1812,7 +1817,18 @@
           statusText.innerText = 'Recording... (Maksimal 10 detik)';
 
           if (window.pywebview) {
-            window.pywebview.api.start_mic_test_record(selectedInput);
+            window.pywebview.api
+              .start_mic_test_record(selectedInput)
+              .then((res) => {
+                if (res && res.success === false) {
+                  statusText.innerText = res.message || 'Test microphone tidak dapat dimulai.';
+                  resetMicTestUI();
+                }
+              })
+              .catch((err) => {
+                statusText.innerText = String(err);
+                resetMicTestUI();
+              });
           }
 
           // Timer pengaman 15 detik di sisi frontend
@@ -1875,18 +1891,33 @@
         if (icon) icon.className = 'bi bi-mic-fill';
       }
 
-      function updateMicMeter(level) {
+      window.updateMicMeter = function (level, dbValue = -60, threshold = null, isPassing = false) {
         const meterContainer = document.getElementById('micMeter');
         if (!meterContainer) return;
         const blocks = meterContainer.querySelectorAll('.meter-block');
-
+        const activeBlocks = Math.round((Math.max(0, Math.min(100, Number(level) || 0)) / 100) * blocks.length);
         blocks.forEach((block, idx) => {
-          if (idx < level) {
+          if (idx < activeBlocks) {
             block.style.background = idx > 5 ? '#e74c3c' : idx > 3 ? '#f1c40f' : '#2ecc71';
-          } else {
-            block.style.background = 'var(--border-color)';
-          }
+          } else block.style.background = 'var(--border-color)';
         });
+        const dbLabel = document.getElementById('micDbValue');
+        if (dbLabel) dbLabel.textContent = `${Number(dbValue).toFixed(1)} dB`;
+        const thresholdValue = threshold === null ? Number(document.getElementById('voiceThreshold')?.value ?? -40) : Number(threshold);
+        const thresholdLabel = document.getElementById('micThresholdStatus');
+        if (thresholdLabel) {
+          thresholdLabel.textContent = `Threshold VAD: ${thresholdValue} dB · ${isPassing ? 'Melewati threshold' : 'Di bawah threshold'}`;
+          thresholdLabel.style.color = isPassing ? 'var(--accent-green)' : 'var(--text-muted)';
+        }
+      };
+
+      function updateVoiceThreshold() {
+        const threshold = document.getElementById('voiceThreshold').value;
+        document.getElementById('thresholdVolText').innerText = `${threshold} dB`;
+        saveSettingsData();
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.update_voice_threshold) {
+          window.pywebview.api.update_voice_threshold(Number(threshold));
+        }
       }
     </script>
   </body>
