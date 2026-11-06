@@ -1312,17 +1312,36 @@
         }
       }
 
-      let currentActivationMode = 'Voice Activation';
-      function setActivationMode(modeName) {
-        currentActivationMode = modeName;
-        document.querySelectorAll('.activation-card').forEach((card) => card.classList.remove('active'));
-        const vaSettings = document.getElementById('voiceActivitySettings');
-        if (vaSettings) vaSettings.style.display = modeName === 'Voice Activation' ? 'flex' : 'none';
-        const activeCard = modeName === 'Voice Activation' ? 'mode-voice' : modeName === 'Continuous' ? 'mode-continuous' : 'mode-ptt';
-        document.getElementById(activeCard)?.classList.add('active');
-        saveSettingsData();
-        if (window.pywebview?.api?.set_activation_mode) {
-          window.pywebview.api.set_activation_mode(modeName);
+      let currentActivationMode = 'Push to Talk';
+      async function setActivationMode(modeName) {
+        const allowedModes = ['Voice Activation', 'Continuous', 'Push to Talk'];
+        if (!allowedModes.includes(modeName)) return;
+        const activeCard = {
+          'Voice Activation': 'mode-voice',
+          Continuous: 'mode-continuous',
+          'Push to Talk': 'mode-ptt',
+        }[modeName];
+        try {
+          if (!window.pywebview?.api?.set_activation_mode) {
+            console.error('[SETTINGS] Python API belum tersedia.');
+            return;
+          }
+          const result = await window.pywebview.api.set_activation_mode(modeName);
+          if (!result?.success) {
+            console.error('[SETTINGS] Gagal menyimpan:', result?.message);
+            return;
+          }
+
+          currentActivationMode = modeName;
+          document.querySelectorAll('.activation-card').forEach((card) => card.classList.remove('active'));
+          document.getElementById(activeCard)?.classList.add('active');
+          const vaSettings = document.getElementById('voiceActivitySettings');
+          if (vaSettings) {
+            vaSettings.style.display = modeName === 'Voice Activation' ? 'flex' : 'none';
+          }
+          console.log('[SETTINGS] Mode berhasil disimpan:', result.mode);
+        } catch (error) {
+          console.error('[SETTINGS] Error:', error);
         }
       }
 
@@ -1911,13 +1930,34 @@
         }
       };
 
+      let thresholdSaveTimer = null;
+
       function updateVoiceThreshold() {
         const threshold = document.getElementById('voiceThreshold').value;
+
         document.getElementById('thresholdVolText').innerText = `${threshold} dB`;
-        saveSettingsData();
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.update_voice_threshold) {
-          window.pywebview.api.update_voice_threshold(Number(threshold));
+
+        // Batalkan jadwal simpan sebelumnya
+        if (thresholdSaveTimer) {
+          clearTimeout(thresholdSaveTimer);
         }
+
+        // Simpan setelah slider berhenti digeser selama 400 ms
+        thresholdSaveTimer = setTimeout(async () => {
+          if (window.pywebview?.api?.update_voice_threshold) {
+            try {
+              const result = await window.pywebview.api.update_voice_threshold(Number(threshold));
+
+              if (result?.success) {
+                showSaveIndicator();
+              } else {
+                console.error('[SETTINGS] Gagal menyimpan threshold:', result);
+              }
+            } catch (error) {
+              console.error('[SETTINGS] Error menyimpan threshold:', error);
+            }
+          }
+        }, 400);
       }
     </script>
   </body>

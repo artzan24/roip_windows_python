@@ -69,6 +69,8 @@ class RoIPLoginAPI:
         self.was_transmitting = False
         self.ptt_start_time = 0
         self.is_ptt_active = False
+
+        self.settings_lock = threading.RLock()
         
         # Inisialisasi Thread Lock untuk keamanan akses memori audio secara multi-thread
         self.audio_lock = threading.Lock()
@@ -380,29 +382,61 @@ class RoIPLoginAPI:
         except Exception as e:
             print("Gagal menyimpan config.json:", e)
 
-    def save_settings_to_json(self, settings_data):
-        try:
-            existing_data = {}
-            if os.path.exists(SETTINGS_FILE):
-                with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-                    try:
-                        existing_data = json.load(f)
-                    except Exception:
-                        pass
-            
-            if isinstance(settings_data, dict):
-                existing_data.update(settings_data)
-            else:
-                existing_data = settings_data
+    def save_settings_to_json(self, new_settings):
+        import tempfile
+        temp_file = None
+        with self.settings_lock:
+            try:
+                if not isinstance(new_settings, dict):
+                    return False
+                existing_data = self.load_settings_from_json()
+                existing_data.update(new_settings)
+                for key in ("hardwareInterface", "shortcuts", "notifications"):
+                    if isinstance(new_settings.get(key), dict):
+                        existing_data[key].update(new_settings[key])
+                settings_path = os.path.abspath(SETTINGS_FILE)
+                settings_dir = os.path.dirname(settings_path)
 
-            with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
-                json.dump(existing_data, f, indent=4)
-                
-            self._load_volumes_from_settings()
-            return {"status": "success", "message": "Settings saved successfully"}
-        except Exception as e:
-            print("Gagal menyimpan settings.json:", e)
-            return {"status": "error", "message": str(e)}
+                # Buat file sementara dengan nama unik
+                fd, temp_file = tempfile.mkstemp(
+                    prefix="settings_",
+                    suffix=".tmp",
+                    dir=settings_dir
+                )
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(
+                        existing_data,
+                        f,
+                        indent=4,
+                        ensure_ascii=False
+                    )
+                    f.flush()
+                    os.fsync(f.fileno())
+
+                # Retry jika Windows sementara mengunci file
+                for attempt in range(6):
+                    try:
+                        os.replace(temp_file, settings_path)
+                        temp_file = None
+                        break
+                    except PermissionError:
+                        if attempt == 5:
+                            raise
+                        time.sleep(0.2 * (attempt + 1))
+
+                print("[SETTINGS] Berhasil menyimpan settings.json")
+                return True
+
+            except Exception as e:
+                print(f"[SETTINGS ERROR] Gagal menyimpan settings.json: {e}")
+                return False
+
+            finally:
+                if temp_file and os.path.exists(temp_file):
+                    try:
+                        os.remove(temp_file)
+                    except OSError:
+                        pass
 
     def load_settings_from_json(self):
         default_settings = {
@@ -430,24 +464,44 @@ class RoIPLoginAPI:
             }
         }
 
-        if os.path.exists(SETTINGS_FILE):
+        # Gunakan lock agar pembacaan tidak bertabrakan dengan proses penyimpanan
+        with self.settings_lock:
             try:
-                if os.path.getsize(SETTINGS_FILE) == 0:
+                if not os.path.exists(SETTINGS_FILE):
                     return default_settings
 
-                with open(SETTINGS_FILE, 'r', encoding='utf-8-sig') as f:
+                with open(SETTINGS_FILE, "r", encoding="utf-8-sig") as f:
                     content = f.read().strip()
-                    if not content:
-                        return default_settings
-                    
-                    saved_data = json.loads(content)
-                    if isinstance(saved_data, dict):
-                        default_settings.update(saved_data)
+
+                if not content:
                     return default_settings
+
+                saved_data = json.loads(content)
+
+                if not isinstance(saved_data, dict):
+                    print("[SETTINGS ERROR] Format settings.json harus berupa object JSON.")
+                    return default_settings
+
+                # Gabungkan pengaturan utama
+                default_settings.update(saved_data)
+
+                # Pastikan bagian bertingkat tetap memiliki default
+                for key in ("hardwareInterface", "shortcuts", "notifications"):
+                    if isinstance(saved_data.get(key), dict):
+                        default_settings[key].update(saved_data[key])
+
+                return default_settings
+
+            except json.JSONDecodeError as e:
+                print(
+                    f"[SETTINGS ERROR] JSON tidak valid: {e}\n"
+                    f"[SETTINGS DEBUG] File: {os.path.abspath(SETTINGS_FILE)}"
+                )
+
             except Exception as e:
-                print(f"[SETTINGS ERROR] Gagal membaca settings.json (menggunakan default): {e}")
-                
-        return default_settings
+                print(f"[SETTINGS ERROR] Gagal membaca settings.json: {e}")
+
+            return default_settings
 
     def login_action(self, ip, port, username, password):
         self.save_config(ip, port, username)
@@ -1033,26 +1087,59 @@ class RoIPLoginAPI:
         }
 
     def set_activation_mode(self, mode_name):
-        allowed_modes = [
-            "Push to Talk",
-            "Voice Activation",
-            "Continuous"
-        ]
+        """Hanya menyimpan mode audio dari halaman Settings."""
+        allowed = ("Voice Activation", "Continuous", "Push to Talk")
 
-        if mode_name not in allowed_modes:
+        if mode_name not in allowed:
             return {
                 "success": False,
-                "message": "Mode tidak valid"
+                "message": "Mode aktivasi tidak valid"
             }
 
-        settings = self.load_settings_from_json()
-        settings["activationMode"] = mode_name
-        self.save_settings_to_json(settings)
+        try:
+            settings = self.load_settings_from_json()
+            settings["activationMode"] = mode_name
+            self.save_settings_to_json(settings)
 
-        return {
-            "success": True,
-            "mode": mode_name
-        }
+            # Hentikan stream jika sebelumnya masih aktif.
+            self.is_recording = False
+
+            if self.recording_thread and self.recording_thread.is_alive():
+                self.recording_thread.join(timeout=2)
+
+            # Lepaskan floor jika sebelumnya VAD sedang transmit.
+            if self.vad_floor_requested or self.vad_floor_granted:
+                if self.sio.connected and self.current_user:
+                    self.sio.emit("release_floor", {
+                        "roomId": str(
+                            self.ptt_request_room_id or self.current_room_id
+                        ),
+                        "userId": str(self.current_user.get("id", ""))
+                    })
+
+            self.vad_floor_requested = False
+            self.vad_floor_granted = False
+            self.vad_voice_since = None
+            self.vad_silence_since = None
+            self.ptt_floor_requested = False
+            self.ptt_floor_granted = False
+            self.ptt_request_room_id = None
+            self.is_ptt_active = False
+
+            print(f"[SETTINGS] Mode audio disimpan: {mode_name}")
+            print("[SETTINGS] Tidak menjalankan audio transmit dari halaman Settings.")
+
+            return {
+                "success": True,
+                "mode": mode_name
+            }
+
+        except Exception as e:
+            print(f"[SETTINGS ERROR] {e}")
+            return {
+                "success": False,
+                "message": str(e)
+            }
 
     def start_background_recording_if_needed(self):
         try:
@@ -1190,7 +1277,12 @@ class RoIPLoginAPI:
                                 self.sio.emit('request_floor', {
                                     'roomId': str(room_id),
                                     'userId': str(user_id),
-                                    'username': (self.current_user or {}).get('fullname', '')
+                                    'username': (
+                                        self.current_user.get('full_name')
+                                        or self.current_user.get('fullname')
+                                        or self.current_user.get('username')
+                                        or 'Unknown User'
+                                    )
                                 })
                                 print(f"[VAD] Meminta floor room={room_id}")
                     else:
