@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="id">
+
   <head>
     <meta charset="UTF-8" />
     <title>Fancy Mumble - Settings</title>
@@ -458,11 +459,11 @@
         border-radius: 50%;
       }
 
-      .toggle-switch input:checked + .toggle-slider {
+      .toggle-switch input:checked+.toggle-slider {
         background-color: var(--accent-blue, #38bdf8);
       }
 
-      .toggle-switch input:checked + .toggle-slider:before {
+      .toggle-switch input:checked+.toggle-slider:before {
         transform: translateX(22px);
       }
 
@@ -584,10 +585,7 @@
           <div id="tab-audio" class="settings-tab-pane active">
             <div class="settings-header" style="display: flex; align-items: center; gap: 12px">
               <h2>Audio dan Perangkat</h2>
-              <button
-                onclick="refreshAudioDevices()"
-                title="Refresh Perangkat Audio"
-                style="
+              <button onclick="refreshAudioDevices()" title="Refresh Perangkat Audio" style="
                   background: var(--bg-card);
                   border: 1px solid var(--border-color);
                   border-radius: 6px;
@@ -622,10 +620,7 @@
                       <i class="bi bi-chevron-down"></i>
                     </div>
                     <div class="custom-options" id="options-inputDevice">
-                      <div
-                        class="custom-option selected"
-                        data-value="System default"
-                        onclick="selectCustomOption('inputDevice', 'System default', 'System default')">
+                      <div class="custom-option selected" data-value="System default" onclick="selectCustomOption('inputDevice', 'System default', 'System default')">
                         System default
                       </div>
                     </div>
@@ -635,12 +630,7 @@
 
                 <!-- Tombol, Meteran, & Status ala Zoom -->
                 <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px">
-                  <button
-                    onclick="toggleMicTest()"
-                    id="btnMicTest"
-                    type="button"
-                    class="btn-test-audio"
-                    style="
+                  <button onclick="toggleMicTest()" id="btnMicTest" type="button" class="btn-test-audio" style="
                       background: var(--bg-card);
                       border: 1px solid var(--border-color);
                       border-radius: 6px;
@@ -669,8 +659,7 @@
                   </div>
                 </div>
                 <!-- Teks status kecil di bawah tombol ala Zoom -->
-                <div
-                  style="
+                <div style="
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
@@ -687,14 +676,7 @@
                   <span>Microphone Volume</span>
                   <span id="micVolText" style="color: var(--accent-blue); font-weight: 600">100%</span>
                 </div>
-                <input
-                  type="range"
-                  class="settings-slider"
-                  id="micVolume"
-                  min="0"
-                  max="100"
-                  value="100"
-                  oninput="updateSliderLabel('micVolume', 'micVolText', '%')"
+                <input type="range" class="settings-slider" id="micVolume" min="0" max="100" value="100" oninput="updateSliderLabel('micVolume', 'micVolText', '%')"
                   onchange="saveSettingsData()" />
               </div>
 
@@ -710,10 +692,7 @@
                       <i class="bi bi-chevron-down"></i>
                     </div>
                     <div class="custom-options" id="options-outputDevice">
-                      <div
-                        class="custom-option selected"
-                        data-value="System default"
-                        onclick="selectCustomOption('outputDevice', 'System default', 'System default')">
+                      <div class="custom-option selected" data-value="System default" onclick="selectCustomOption('outputDevice', 'System default', 'System default')">
                         System default
                       </div>
                     </div>
@@ -723,12 +702,7 @@
 
                 <!-- Tombol & Meteran Test Speaker (Gaya Zoom) -->
                 <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px">
-                  <button
-                    onclick="runSpeakerTest()"
-                    type="button"
-                    class="btn-test-audio"
-                    id="btnSpeakerTest"
-                    style="
+                  <button onclick="runSpeakerTest()" type="button" class="btn-test-audio" id="btnSpeakerTest" style="
                       background: var(--bg-card);
                       border: 1px solid var(--border-color);
                       border-radius: 6px;
@@ -761,14 +735,7 @@
                   <span>Speaker Volume</span>
                   <span id="speakerVolText" style="color: var(--accent-blue); font-weight: 600">100%</span>
                 </div>
-                <input
-                  type="range"
-                  class="settings-slider"
-                  id="speakerVolume"
-                  min="0"
-                  max="100"
-                  value="100"
-                  oninput="updateSliderLabel('speakerVolume', 'speakerVolText', '%')"
+                <input type="range" class="settings-slider" id="speakerVolume" min="0" max="100" value="100" oninput="updateSliderLabel('speakerVolume', 'speakerVolText', '%')"
                   onchange="saveSettingsData()" />
               </div>
             </div>
@@ -834,8 +801,7 @@
                     <div class="meter-block" style="flex: 1; background: var(--border-color); border-radius: 2px"></div>
                   </div>
                   <!-- Panel Log Mikrofon Aktif -->
-                  <div
-                    style="
+                  <div style="
                       margin-top: 12px;
                       background: var(--bg-card);
                       border: 1px solid var(--border-color);
@@ -849,9 +815,7 @@
                       </span>
                       <span id="activeMicNameLabel" style="font-size: 11px; color: var(--accent-blue)">Memuat perangkat...</span>
                     </div>
-                    <div
-                      id="micDebugLog"
-                      style="
+                    <div id="micDebugLog" style="
                         font-family: monospace;
                         font-size: 11px;
                         color: var(--text-muted);
@@ -892,9 +856,7 @@
                 <div class="settings-group" style="flex: 1">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; height: 18px">
                     <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 0">Serial Port (COM)</label>
-                    <span
-                      onclick="loadComPorts()"
-                      style="font-size: 11px; color: var(--accent-blue); cursor: pointer; display: flex; align-items: center; gap: 4px"
+                    <span onclick="loadComPorts()" style="font-size: 11px; color: var(--accent-blue); cursor: pointer; display: flex; align-items: center; gap: 4px"
                       title="Cari ulang port COM">
                       <i class="bi bi-arrow-clockwise"></i>
                       Refresh
@@ -977,8 +939,7 @@
             <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px">
               <span style="font-size: 13px; font-weight: 500; color: var(--text-normal)">Push to talk</span>
               <div style="display: flex; align-items: center; gap: 8px">
-                <div
-                  style="
+                <div style="
                     background-color: var(--bg-card);
                     border: 1px solid var(--border-color);
                     border-radius: 8px;
@@ -988,15 +949,12 @@
                     align-items: center;
                     justify-content: space-between;
                     cursor: pointer;
-                  "
-                  onclick="startRecordShortcut(this, 'ptt')">
+                  " onclick="startRecordShortcut(this, 'ptt')">
                   <span id="shortcut-ptt" style="font-size: 13px; color: var(--text-normal)">SPACE</span>
                   <i class="bi bi-pencil" style="font-size: 12px; color: var(--text-muted)"></i>
                 </div>
-                <button
-                  style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px"
-                  onclick="clearShortcut('shortcut-ptt')"
-                  title="Hapus Shortcut">
+                <button style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px"
+                  onclick="clearShortcut('shortcut-ptt')" title="Hapus Shortcut">
                   <i class="bi bi-x-lg"></i>
                 </button>
               </div>
@@ -1006,8 +964,7 @@
             <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px">
               <span style="font-size: 13px; font-weight: 500; color: var(--text-normal)">Toggle mute</span>
               <div style="display: flex; align-items: center; gap: 8px">
-                <div
-                  style="
+                <div style="
                     background-color: var(--bg-card);
                     border: 1px solid var(--border-color);
                     border-radius: 8px;
@@ -1017,15 +974,12 @@
                     align-items: center;
                     justify-content: space-between;
                     cursor: pointer;
-                  "
-                  onclick="startRecordShortcut(this, 'mute')">
+                  " onclick="startRecordShortcut(this, 'mute')">
                   <span id="shortcut-mute" style="font-size: 13px; color: var(--text-normal)">Ctrl+A</span>
                   <i class="bi bi-pencil" style="font-size: 12px; color: var(--text-muted)"></i>
                 </div>
-                <button
-                  style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px"
-                  onclick="clearShortcut('shortcut-mute')"
-                  title="Hapus Shortcut">
+                <button style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px"
+                  onclick="clearShortcut('shortcut-mute')" title="Hapus Shortcut">
                   <i class="bi bi-x-lg"></i>
                 </button>
               </div>
@@ -1035,8 +989,7 @@
             <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px">
               <span style="font-size: 13px; font-weight: 500; color: var(--text-normal)">Toggle deafen</span>
               <div style="display: flex; align-items: center; gap: 8px">
-                <div
-                  style="
+                <div style="
                     background-color: var(--bg-card);
                     border: 1px solid var(--border-color);
                     border-radius: 8px;
@@ -1046,15 +999,12 @@
                     align-items: center;
                     justify-content: space-between;
                     cursor: pointer;
-                  "
-                  onclick="startRecordShortcut(this, 'deafen')">
+                  " onclick="startRecordShortcut(this, 'deafen')">
                   <span id="shortcut-deafen" style="font-size: 13px; color: var(--text-normal)">Ctrl+N</span>
                   <i class="bi bi-pencil" style="font-size: 12px; color: var(--text-muted)"></i>
                 </div>
-                <button
-                  style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px"
-                  onclick="clearShortcut('shortcut-deafen')"
-                  title="Hapus Shortcut">
+                <button style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px"
+                  onclick="clearShortcut('shortcut-deafen')" title="Hapus Shortcut">
                   <i class="bi bi-x-lg"></i>
                 </button>
               </div>
@@ -1086,8 +1036,7 @@
             </div>
 
             <!-- Item 1: Suara Notifikasi -->
-            <div
-              style="
+            <div style="
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
@@ -1107,8 +1056,7 @@
             </div>
 
             <!-- Item 2: Notifikasi Sistem (Native) -->
-            <div
-              style="
+            <div style="
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
@@ -1141,10 +1089,7 @@
                     <i class="bi bi-chevron-down"></i>
                   </div>
                   <div class="custom-options" id="options-welcomeMsg">
-                    <div
-                      class="custom-option selected"
-                      data-value="Show once"
-                      onclick="selectCustomOption('welcomeMsg', 'Show once', 'Tampilkan sekali')">
+                    <div class="custom-option selected" data-value="Show once" onclick="selectCustomOption('welcomeMsg', 'Show once', 'Tampilkan sekali')">
                       Tampilkan sekali
                     </div>
                     <div class="custom-option" data-value="Always" onclick="selectCustomOption('welcomeMsg', 'Always', 'Selalu tampilkan')">
@@ -1314,12 +1259,16 @@
 
       let currentActivationMode = 'Push to Talk';
       async function setActivationMode(modeName) {
-        const allowedModes = ['Voice Activation', 'Continuous', 'Push to Talk'];
+        const allowedModes = [
+          'Voice Activation',
+          'Continuous',
+          'Push to Talk'
+        ];
         if (!allowedModes.includes(modeName)) return;
         const activeCard = {
           'Voice Activation': 'mode-voice',
-          Continuous: 'mode-continuous',
-          'Push to Talk': 'mode-ptt',
+          'Continuous': 'mode-continuous',
+          'Push to Talk': 'mode-ptt'
         }[modeName];
         try {
           if (!window.pywebview?.api?.set_activation_mode) {
@@ -1331,13 +1280,20 @@
             console.error('[SETTINGS] Gagal menyimpan:', result?.message);
             return;
           }
-
           currentActivationMode = modeName;
-          document.querySelectorAll('.activation-card').forEach((card) => card.classList.remove('active'));
+
+          document.querySelectorAll('.activation-card')
+            .forEach(card => card.classList.remove('active'));
+
           document.getElementById(activeCard)?.classList.add('active');
           const vaSettings = document.getElementById('voiceActivitySettings');
           if (vaSettings) {
-            vaSettings.style.display = modeName === 'Voice Activation' ? 'flex' : 'none';
+            vaSettings.style.display =
+              modeName === 'Voice Activation' ? 'flex' : 'none';
+          }
+          // Tampilkan notifikasi penyimpanan berhasil
+          if (!isInitializing) {
+            showSaveIndicator();
           }
           console.log('[SETTINGS] Mode berhasil disimpan:', result.mode);
         } catch (error) {
@@ -1961,4 +1917,5 @@
       }
     </script>
   </body>
+
 </html>

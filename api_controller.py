@@ -294,14 +294,54 @@ class RoIPLoginAPI:
             }
     
     def close_window(self):
+        print("[SHUTDOWN] Memulai proses penutupan aplikasi...")
         try:
+            # 1. Hentikan Voice Activity Monitor
+            self.is_voice_activity_monitoring = False
+            if (self.voice_monitor_thread
+                    and self.voice_monitor_thread.is_alive()):
+                self.voice_monitor_thread.join(timeout=2.0)
+
+            # 2. Hentikan recording utama
+            self.is_recording = False
+            self.is_ptt_active = False
+            self.is_mic_muted = True
+
+            if self.recording_thread and self.recording_thread.is_alive():
+                self.recording_thread.join(timeout=2.0)
+
+            # 3. Hentikan microphone test
+            self.is_recording_mic_test = False
+            self.is_playing_mic_test = False
+
+            if hasattr(self, 'mic_test_thread'):
+                if self.mic_test_thread and self.mic_test_thread.is_alive():
+                    self.mic_test_thread.join(timeout=2.0)
+
+            # 4. Hentikan speaker test
+            self.is_playing_speaker_test = False
+
+            # 5. Putuskan Socket.IO
             if self.sio.connected:
                 self.sio.disconnect()
+
+            # 6. Terminate PyAudio setelah thread audio berhenti
+            if self.pyaudio_instance:
+                self.pyaudio_instance.terminate()
+                self.pyaudio_instance = None
+
+            # 7. Tutup window
             if self.window:
                 self.window.destroy()
-        except Exception:
-            pass
-        sys.exit(0)
+                self.window = None
+
+            print("[SHUTDOWN] Aplikasi berhasil ditutup.")
+
+        except Exception as e:
+            print(f"[SHUTDOWN ERROR] {repr(e)}")
+
+        finally:
+            sys.exit(0)
 
     def minimize_window(self):
         if self.window:
@@ -797,6 +837,7 @@ class RoIPLoginAPI:
 
             def monitor_worker():
                 stream = None
+
                 try:
                     stream = self.pyaudio_instance.open(
                         format=self.FORMAT,
@@ -806,43 +847,59 @@ class RoIPLoginAPI:
                         input_device_index=input_index,
                         frames_per_buffer=self.CHUNK
                     )
+
                     print("[VOICE ACTIVITY] Monitor dimulai")
-                    while (
-                        self.is_voice_activity_monitoring
-                        and not self.is_recording
-                    ):
-                        data = stream.read(
-                            self.CHUNK,
-                            exception_on_overflow=False
-                        )
-                        percent, db = self._get_audio_level(data)
-                        threshold = float(
-                            self.load_settings_from_json().get("voiceThreshold", -40)
-                        )
-                        is_passing = db >= threshold
-                        if self.window:
-                            payload = {
-                                "micName": input_device_name,
-                                "dbValue": db,
-                                "isPassing": is_passing
-                            }
-                            self.window.evaluate_js(
-                                "window.updateVoiceActivityMonitorUI && "
-                                f"window.updateVoiceActivityMonitorUI("
-                                f"{json.dumps(payload['micName'])}, "
-                                f"{payload['dbValue']}, "
-                                f"{str(payload['isPassing']).lower()}"
-                                f")"
+
+                    while self.is_voice_activity_monitoring and not self.is_recording:
+                        try:
+                            data = stream.read(
+                                self.CHUNK,
+                                exception_on_overflow=False
                             )
+
+                            if not self.is_voice_activity_monitoring:
+                                break
+
+                            percent, db = self._get_audio_level(data)
+
+                            threshold = float(
+                                self.load_settings_from_json().get("voiceThreshold", -40)
+                            )
+
+                            is_passing = db >= threshold
+
+                            if self.window and self.is_voice_activity_monitoring:
+                                self.window.evaluate_js(
+                                    "window.updateVoiceActivityMonitorUI && "
+                                    f"window.updateVoiceActivityMonitorUI("
+                                    f"{json.dumps(input_device_name)}, "
+                                    f"{db}, "
+                                    f"{str(is_passing).lower()}"
+                                    f")"
+                                )
+
+                        except Exception as e:
+                            if self.is_voice_activity_monitoring:
+                                print(f"[VOICE ACTIVITY READ ERROR] {repr(e)}")
+                            break
+
                 except Exception as e:
-                    print(f"[VOICE ACTIVITY ERROR] {e}")
+                    if self.is_voice_activity_monitoring:
+                        print(f"[VOICE ACTIVITY ERROR] {repr(e)}")
+
                 finally:
                     if stream:
                         try:
-                            stream.stop_stream()
+                            if stream.is_active():
+                                stream.stop_stream()
+                        except Exception:
+                            pass
+
+                        try:
                             stream.close()
                         except Exception:
                             pass
+
                     print("[VOICE ACTIVITY] Monitor berhenti")
 
             self.voice_monitor_thread = threading.Thread(
@@ -860,13 +917,13 @@ class RoIPLoginAPI:
 
     def stop_voice_activity_monitor(self):
         self.is_voice_activity_monitoring = False
-
-        if (
-            self.voice_monitor_thread
-            and self.voice_monitor_thread.is_alive()
-        ):
-            self.voice_monitor_thread.join(timeout=0.5)
-
+        thread = self.voice_monitor_thread
+        if thread and thread.is_alive():
+            thread.join(timeout=2.0)
+            if thread.is_alive():
+                print("[VOICE ACTIVITY] Monitor masih berjalan saat shutdown.")
+            else:
+                print("[VOICE ACTIVITY] Monitor berhasil dihentikan.")
         return {"success": True}
 
     def stop_mic_test_and_playback(self, output_device_name=None):
