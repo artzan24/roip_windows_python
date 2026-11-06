@@ -1919,14 +1919,32 @@
       }
 
       function switchTab(tabName) {
-        document.querySelectorAll('.tab-btn').forEach((btn) => btn.classList.remove('active'));
-        document.querySelectorAll('.tab-pane').forEach((pane) => pane.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach((btn) => {
+          btn.classList.remove('active');
+        });
+
+        document.querySelectorAll('.tab-pane').forEach((pane) => {
+          pane.classList.remove('active');
+        });
+
         if (tabName === 'channels') {
-          document.querySelector('.sidebar-tabs button:nth-child(1)').classList.add('active');
-          document.getElementById('tab-channels').classList.add('active');
+          document.querySelector('.sidebar-tabs button:nth-child(1)')?.classList.add('active');
+          document.getElementById('tab-channels')?.classList.add('active');
+          // Pulihkan channel terakhir yang dipilih
+          document.querySelectorAll('.channel-row').forEach((row) => {
+            row.classList.remove('active');
+          });
+
+          const selectedChannelId = activeChannelId ?? currentRoomId;
+          if (selectedChannelId !== null && selectedChannelId !== undefined) {
+            const currentRow = document.getElementById(`row-${String(selectedChannelId)}`);
+            if (currentRow) {
+              currentRow.classList.add('active');
+            }
+          }
         } else {
-          document.querySelector('.sidebar-tabs button:nth-child(2)').classList.add('active');
-          document.getElementById('tab-members').classList.add('active');
+          document.querySelector('.sidebar-tabs button:nth-child(2)')?.classList.add('active');
+          document.getElementById('tab-members')?.classList.add('active');
           loadOnlineMembers();
         }
       }
