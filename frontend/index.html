@@ -1791,52 +1791,77 @@
       function renderOnlineMembers(members) {
         const container = document.getElementById('onlineMembersContainer');
         if (!container) return;
+
         container.innerHTML = '';
 
         let membersList = members;
+
         if (members && !Array.isArray(members) && members.data) {
           membersList = members.data;
         }
+
         if (!Array.isArray(membersList)) membersList = [];
 
-        const myUserId = currentUser ? String(currentUser.id) : String(localStorage.getItem('user_id') || '');
-        const filteredMembers = membersList.filter((m) => String(m.id || m.user_id || '') !== myUserId);
+        const myUserId = String(currentUser?.id || localStorage.getItem('user_id') || '');
+
+        const filteredMembers = membersList.filter(
+          m => String(m.id || m.user_id || '') !== myUserId
+        );
 
         if (filteredMembers.length === 0) {
-          container.innerHTML =
-            '<div style="padding: 10px; font-size: 12px; color: var(--text-muted); text-align: center;">Tidak ada member lain online</div>';
+          container.innerHTML = `
+            <div style="padding:10px;font-size:12px;color:var(--text-muted);text-align:center;">
+                Tidak ada member lain online
+            </div>
+        `;
           return;
         }
 
         const colors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#10b981', '#06b6d4'];
+
         filteredMembers.forEach((member, index) => {
           const memberId = member.id || member.user_id;
           const name = member.full_name || member.username || 'User';
-          const initials = name
-            .split(' ')
-            .map((n) => n[0])
+
+          const initials = name.split(' ')
+            .map(n => n[0])
             .join('')
             .substring(0, 2)
             .toUpperCase();
-          const avatarColor = colors[index % colors.length];
-          const roomBadgeText = member.current_room_name ? member.current_room_name.toUpperCase() : 'ONLINE';
-          const isSelectedActive = currentViewMode === 'private' && String(activeTargetUserId) === String(memberId) ? 'active' : '';
 
-          const rowHtml = `
-            <div class="member-row ${isSelectedActive}" id="member-row-${memberId}" onclick="selectPrivateChat('${memberId}', '${escapeHtml(name)}')">
-                <div class="member-left">
-                    <div class="member-avatar" style="background-color: ${avatarColor};">
-                        ${initials}
-                        <span class="member-avatar-dot"></span>
-                    </div>
-                    <div class="member-info">
-                        <span class="member-username">${escapeHtml(name)}</span>
-                    </div>
+          const avatarColor = colors[index % colors.length];
+          const roomBadgeText = member.current_room_name
+            ? member.current_room_name.toUpperCase()
+            : 'ONLINE';
+
+          const isSelectedActive =
+            currentViewMode === 'private' &&
+              String(activeTargetUserId) === String(memberId)
+              ? 'active'
+              : '';
+
+          const row = document.createElement('div');
+          row.className = `member-row ${isSelectedActive}`;
+          row.id = `member-row-${memberId}`;
+
+          row.innerHTML = `
+            <div class="member-left">
+                <div class="member-avatar" style="background-color:${avatarColor};">
+                    ${escapeHtml(initials)}
+                    <span class="member-avatar-dot"></span>
                 </div>
-                <span class="member-badge-room">${escapeHtml(roomBadgeText)}</span>
+                <div class="member-info">
+                    <span class="member-username">${escapeHtml(name)}</span>
+                </div>
             </div>
-          `;
-          container.insertAdjacentHTML('beforeend', rowHtml);
+            <span class="member-badge-room">${escapeHtml(roomBadgeText)}</span>
+        `;
+
+          row.addEventListener('click', () => {
+            selectPrivateChat(memberId, name);
+          });
+
+          container.appendChild(row);
         });
       }
 
