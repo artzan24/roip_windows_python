@@ -1183,6 +1183,10 @@
 
       let currentActivationMode = 'Push to Talk';
       let isTransmittingState = false; // Status lokal PTT
+      // Status operator yang sedang menguasai floor pada channel aktif
+      let activePttUserId = null;
+      let activePttUsername = null;
+      let activePttRoomId = null;
 
       let userShortcuts = {
         pushToTalk: 'SPACE',
@@ -1215,6 +1219,8 @@
         console.warn('[PTT] Floor ditolak:', data);
 
         isTransmittingState = false;
+        pttPressLocked = false;
+
         resetPttUI();
 
         Swal.fire({
@@ -1539,23 +1545,6 @@
           displayPrivateMessage(data);
         });
 
-        socket.on('floor_denied', (data) => {
-          console.warn('[PTT] Floor DITOLAK (Busy) oleh server:', data);
-          isTransmittingState = false;
-          resetPttUI();
-
-          Swal.fire({
-            toast: true,
-            position: 'top-end',
-            icon: 'warning',
-            title: data && data.message ? data.message : 'Channel sedang digunakan (Busy / Transmitting)',
-            showConfirmButton: false,
-            timer: 3000,
-            background: '#0f172a',
-            color: '#f1f5f9',
-          });
-        });
-
         socket.on('user_ptt_broadcast', (data) => {
           console.log('[PTT BROADCAST] Status diterima:', data);
 
@@ -1590,91 +1579,143 @@
         });
       }
 
-      // --- HANDLE PEER PTT STATUS DI ROOM YANG SAMA ---
-      let pttBusyTimeout = null;
-
-      function handlePeerPTTStatus(data, isTransmitting) {
-        const msgRoomId = String(data.roomId || data.room_id || data.channel_id || currentRoomId);
-
-        // Abaikan event dari room lain
-        if (msgRoomId !== String(currentRoomId)) return;
-
-        const activeSpeakerName = document.getElementById('activeSpeakerName');
-        const pttIndicator = document.getElementById('pttIndicator');
+      function setPttAvailability(isBusy, username = '') {
         const pttBtn = document.getElementById('pttButton');
+        const pttIndicator = document.getElementById('pttIndicator');
 
-        const myUserId = currentUser ? String(currentUser.id) : '';
-        const peerUserId = String(data.userId || data.sender_id || data.user_id || '');
+        if (!pttBtn) return;
 
-        // Identifikasi apakah event berasal dari diri sendiri
-        const isMe = peerUserId && myUserId && peerUserId === myUserId;
+        const myId = String(currentUser?.id || '');
+        const isMyTransmission = activePttUserId === myId;
 
-        // Event status PTT milik sendiri
-        if (isMe) {
-          if (!isTransmitting) {
-            resetPttUI();
+        // Jangan menonaktifkan tombol milik operator yang sedang berbicara.
+        if (isBusy && !isMyTransmission) {
+          pttBtn.disabled = true;
+          pttBtn.style.opacity = '0.4';
+          pttBtn.style.cursor = 'not-allowed';
+          pttBtn.title = `Channel sedang digunakan oleh ${username || 'operator lain'}`;
+
+          if (pttIndicator) {
+            pttIndicator.innerText = `${username || 'OPERATOR'} ON AIR (BUSY)`;
+            pttIndicator.style.color = '#ef4444';
           }
           return;
         }
 
-        // User lain sedang menggunakan PTT
-        if (isTransmitting) {
-          const username = data.username || data.sender_name || 'USER';
-
-          if (activeSpeakerName) {
-            activeSpeakerName.innerText = username;
-          }
-
-          if (pttIndicator) {
-            pttIndicator.innerText = `${username.toUpperCase()} ON AIR (BUSY)`;
-            pttIndicator.style.color = '#ef4444';
-          }
-
-          if (pttBtn) {
-            pttBtn.style.opacity = '0.4';
-            pttBtn.style.cursor = 'not-allowed';
-            pttBtn.disabled = true;
-            pttBtn.title = 'Channel sedang digunakan (Busy)';
-          }
-        } else {
-          // User lain sudah melepaskan PTT
-          if (activeSpeakerName) {
-            activeSpeakerName.innerText = 'Belum ada transmisi';
-          }
+        if (!isBusy) {
+          pttBtn.disabled = false;
+          pttBtn.style.opacity = '1';
+          pttBtn.style.cursor = 'pointer';
+          pttBtn.title = 'Tekan atau Spasi untuk Bicara';
 
           if (pttIndicator) {
             pttIndicator.innerText = 'SIAP (READY)';
             pttIndicator.style.color = '#22c55e';
           }
+        }
+      }
 
-          if (pttBtn && currentActivationMode === 'Push to Talk') {
-            pttBtn.style.opacity = '1';
-            pttBtn.style.cursor = 'pointer';
-            pttBtn.disabled = false;
-            pttBtn.title = 'Tekan atau Spasi untuk Bicara';
+      // --- HANDLE PEER PTT STATUS DI ROOM YANG SAMA ---
+      let pttBusyTimeout = null;
+
+      function handlePeerPTTStatus(data, isTransmitting) {
+        const msgRoomId = String(data.roomId || data.room_id || data.channel_id || '');
+
+        // Abaikan event jika bukan channel aktif.
+        if (msgRoomId !== String(currentRoomId)) return;
+
+        const userId = String(data.userId || data.user_id || data.sender_id || '');
+
+        if (!userId) {
+          console.warn('[PTT] Event tidak memiliki userId:', data);
+          return;
+        }
+
+        const username = data.username || data.sender_name || 'OPERATOR';
+        const myId = String(currentUser?.id || '');
+
+        if (isTransmitting) {
+          // Catat operator yang sedang menguasai floor.
+          activePttUserId = userId;
+          activePttUsername = username;
+          activePttRoomId = msgRoomId;
+
+          const activeSpeakerName = document.getElementById('activeSpeakerName');
+
+          if (activeSpeakerName) {
+            activeSpeakerName.innerText = username;
           }
+
+          if (userId === myId) {
+            // PTT milik sendiri: jangan disable tombol agar bisa dilepas.
+            const pttIndicator = document.getElementById('pttIndicator');
+            if (pttIndicator) {
+              pttIndicator.innerText = 'TRANSMISI ON AIR';
+              pttIndicator.style.color = '#ef4444';
+            }
+            return;
+          }
+
+          // PTT milik operator lain: disable tombol.
+          setPttAvailability(true, username);
+
+          // Batalkan status tekan lokal jika sebelumnya belum mendapat floor.
+          if (!isTransmittingState) {
+            pttPressLocked = false;
+          }
+
+          return;
+        }
+
+        // Abaikan event release dari operator yang bukan pemegang floor.
+        if (activePttUserId && activePttUserId !== userId) {
+          return;
+        }
+
+        // Floor sudah dilepas.
+        activePttUserId = null;
+        activePttUsername = null;
+        activePttRoomId = null;
+
+        if (userId === myId) {
+          resetPttUI();
+        } else {
+          const activeSpeakerName = document.getElementById('activeSpeakerName');
+
+          if (activeSpeakerName) {
+            activeSpeakerName.innerText = 'Belum ada transmisi';
+          }
+
+          setPttAvailability(false);
         }
       }
 
       function resetPttUI() {
         isTransmittingState = false;
+
         const pttBtn = document.getElementById('pttButton');
         const pttBtnText = document.getElementById('pttBtnText');
-        const pttIndicator = document.getElementById('pttIndicator');
         const activeSpeakerName = document.getElementById('activeSpeakerName');
 
         if (pttBtn) {
           pttBtn.classList.remove('active');
-          pttBtn.disabled = false;
-          pttBtn.style.opacity = '1';
-          pttBtn.style.cursor = 'pointer';
         }
-        if (pttBtnText) pttBtnText.innerText = 'PTT';
-        if (pttIndicator) {
-          pttIndicator.innerText = 'SIAP (READY)';
-          pttIndicator.style.color = '#22c55e';
+
+        if (pttBtnText) {
+          pttBtnText.innerText = 'PTT';
         }
-        if (activeSpeakerName) activeSpeakerName.innerText = 'Belum ada transmisi';
+
+        // Jangan aktifkan tombol jika operator lain masih menguasai floor.
+        const isOtherUserBusy = activePttUserId && activePttUserId !== String(currentUser?.id || '') && activePttRoomId === String(currentRoomId);
+
+        if (isOtherUserBusy) {
+          setPttAvailability(true, activePttUsername);
+        } else {
+          setPttAvailability(false);
+          if (activeSpeakerName) {
+            activeSpeakerName.innerText = 'Belum ada transmisi';
+          }
+        }
       }
 
       // --- LIVE CHAT DISPLAY FUNCTIONS (DIPERBAIKI) ---
@@ -2302,15 +2343,8 @@
 
         const pttBtn = document.getElementById('pttButton');
         if (pttBtn && pttBtn.disabled) {
-          console.warn('[PTT] Tombol terkunci, channel sedang digunakan (Busy).');
-          Swal.fire({
-            icon: 'warning',
-            title: 'Channel sedang digunakan (Busy / Transmitting)',
-            showConfirmButton: false,
-            timer: 3000,
-            background: '#0f172a',
-            color: '#f1f5f9',
-          });
+          pttPressLocked = false;
+          console.warn('[PTT] Channel sedang digunakan.');
           return;
         }
 
@@ -2411,8 +2445,6 @@
               const pttBtn = document.getElementById('pttButton');
               if (pttBtn && pttBtn.disabled) {
                 Swal.fire({
-                  toast: true,
-                  position: 'top-end',
                   icon: 'warning',
                   title: 'Channel sedang digunakan (Busy / Transmitting)',
                   showConfirmButton: false,
