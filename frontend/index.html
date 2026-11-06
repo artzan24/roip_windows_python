@@ -1217,6 +1217,7 @@
 
       window.handleFloorDenied = function (data) {
         console.warn('[PTT] Floor ditolak:', data);
+        console.error('[PTT DEBUG] handleFloorDenied TERPANGGIL:', data);
 
         isTransmittingState = false;
         pttPressLocked = false;
@@ -1231,6 +1232,10 @@
           background: '#0f172a',
           color: '#f1f5f9',
         });
+      };
+
+      window.updatePeerPTTStatus = function (data) {
+        handlePeerPTTStatus(data, data.isTransmitting);
       };
 
       async function loadAppSettings() {
@@ -2444,14 +2449,6 @@
             if (matchesShortcut(e, userShortcuts.pushToTalk)) {
               const pttBtn = document.getElementById('pttButton');
               if (pttBtn && pttBtn.disabled) {
-                Swal.fire({
-                  icon: 'warning',
-                  title: 'Channel sedang digunakan (Busy / Transmitting)',
-                  showConfirmButton: false,
-                  timer: 3000,
-                  background: '#0f172a',
-                  color: '#f1f5f9',
-                });
                 return;
               }
 

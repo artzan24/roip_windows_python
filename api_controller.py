@@ -115,10 +115,13 @@ class RoIPLoginAPI:
         @self.sio.on('user_ptt_broadcast')
         def on_user_ptt_broadcast(data):
             print(f"[DEBUG LOG - PTT BROADCAST] Status PTT user lain diterima: {data}")
+
             if self.window:
                 try:
                     safe_data = json.dumps(data)
-                    self.window.evaluate_js(f"if(typeof updatePeerPTTStatus === 'function') {{ updatePeerPTTStatus({safe_data}); }}")
+                    self.window.evaluate_js(
+                        f"window.updatePeerPTTStatus && window.updatePeerPTTStatus({safe_data})"
+                    )
                 except Exception as e:
                     print(f"[ERROR LOG] Gagal mengevaluasi JS user_ptt_broadcast: {e}")
 
@@ -160,6 +163,16 @@ class RoIPLoginAPI:
             self.ptt_cancel_pending = False
             self.ptt_request_room_id = None
 
+            if self.window:
+                try:
+                    self.window.evaluate_js(
+                        "window.handleFloorDenied && window.handleFloorDenied("
+                        + json.dumps(data)
+                        + ")"
+                    )
+                except Exception as e:
+                    print(f"[PTT FLOOR] Gagal mengirim floor_denied ke frontend: {e}")
+
 
         @self.sio.on('floor_released')
         def on_floor_released(data):
@@ -170,13 +183,18 @@ class RoIPLoginAPI:
             self.ptt_cancel_pending = False
             self.ptt_request_room_id = None
 
-            # Kirim notifikasi penolakan ke frontend
+            # Beri tahu frontend bahwa channel sudah READY
             if self.window:
-                self.window.evaluate_js(
-                    "window.handleFloorDenied && window.handleFloorDenied("
-                    + json.dumps(data)
-                    + ")"
-                )
+                try:
+                    safe_data = json.dumps(data)
+
+                    self.window.evaluate_js(
+                        f"if(typeof handlePeerPTTStatus === 'function') "
+                        f"{{ handlePeerPTTStatus({safe_data}, false); }}"
+                    )
+
+                except Exception as e:
+                    print(f"[PTT FLOOR] Gagal update status READY: {e}")
 
         @self.sio.on('update_user_connection')
         def on_update_user_connection(data):
