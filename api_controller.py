@@ -52,7 +52,7 @@ class RoIPLoginAPI:
         self.vad_last_request_at = 0.0
         self.vad_floor_requested = False
         self.vad_floor_granted = False
-        self.vad_hangover_seconds = 0.7
+        self.vad_hangover_seconds = 2.0
         self._resume_stream_after_mic_test = False
 
         self.ptt_floor_requested = False
