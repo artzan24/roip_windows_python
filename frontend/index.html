@@ -1,8 +1,10 @@
 <!doctype html>
 <html lang="id">
+
   <head>
     <meta charset="UTF-8" />
-    <title>Fancy Mumble - Dispatcher Console</title>
+    <title>Roip TIK Polda Bali - Dispatcher Console</title>
+    <link rel="icon" type="image/x-icon" href="/assets/icons/app.ico">
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -312,7 +314,7 @@
       }
 
       .btn-mini-ctrl.mic-active {
-        background-color: var(--accent-orange);
+        background-color: #15803d;
         color: white;
       }
 
@@ -750,6 +752,21 @@
         gap: 4px;
       }
 
+      .ptt-activity-logo {
+        width: 76px;
+        height: 76px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 5px;
+      }
+
+      .ptt-activity-logo img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
       .ptt-activity-label {
         font-size: 10px;
         color: var(--text-muted);
@@ -951,6 +968,79 @@
         border-radius: 8px;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
       }
+
+      /* PRIVATE PTT - OPERATOR LAWAN SEDANG BICARA */
+      .ptt-round-btn.private-peer-transmitting {
+        background: #dc2626 !important;
+        border-color: #ef4444 !important;
+        color: #fff !important;
+        box-shadow: 0 0 25px rgba(220, 38, 38, .45) !important;
+        cursor: not-allowed !important;
+      }
+
+      .ptt-round-btn.private-peer-transmitting i {
+        color: #fff !important;
+      }
+
+      /* Voice Signal Indicator */
+      .voice-signal {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        height: 22px;
+        margin-left: 10px;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity .2s ease;
+      }
+
+      .voice-signal span {
+        display: block;
+        width: 3px;
+        height: 4px;
+        border-radius: 5px;
+        background: #ba04b7;
+      }
+
+      .voice-signal.active {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .voice-signal.active span {
+        animation: voiceWave .55s ease-in-out infinite alternate;
+      }
+
+      .voice-signal.active span:nth-child(1) {
+        animation-delay: .1s;
+      }
+
+      .voice-signal.active span:nth-child(2) {
+        animation-delay: .25s;
+      }
+
+      .voice-signal.active span:nth-child(3) {
+        animation-delay: .05s;
+      }
+
+      .voice-signal.active span:nth-child(4) {
+        animation-delay: .2s;
+      }
+
+      .voice-signal.active span:nth-child(5) {
+        animation-delay: .15s;
+      }
+
+      @keyframes voiceWave {
+        0% {
+          height: 4px;
+        }
+
+        100% {
+          height: 20px;
+        }
+      }
     </style>
   </head>
 
@@ -970,10 +1060,7 @@
         </div>
         <div class="title-controls">
           <!-- Indikator Status Koneksi -->
-          <div
-            id="connection-status-badge"
-            class="connection-badge online"
-            style="display: flex; align-items: center; margin-right: 15px; font-size: 12px; font-weight: 500">
+          <div id="connection-status-badge" class="connection-badge online" style="display: flex; align-items: center; margin-right: 15px; font-size: 12px; font-weight: 500">
             <span id="status-dot" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px"></span>
             <span id="status-text">Online</span>
           </div>
@@ -1092,13 +1179,7 @@
               <div class="chat-input-panel" id="chatInputPanel">
                 <input type="text" class="chat-input-box" id="messageInput" placeholder="Ketik pesan chat..." onkeypress="handleKeyPress(event)" />
                 <div id="inputActionsContainer" style="display: flex; gap: 8px; align-items: center">
-                  <button
-                    class="btn-send"
-                    onclick="sendMessage()"
-                    id="sendBtn"
-                    title="Kirim Pesan"
-                    disabled
-                    style="opacity: 0.5; cursor: not-allowed">
+                  <button class="btn-send" onclick="sendMessage()" id="sendBtn" title="Kirim Pesan" disabled style="opacity: 0.5; cursor: not-allowed">
                     <i class="bi bi-send-fill"></i>
                   </button>
                 </div>
@@ -1112,20 +1193,26 @@
                 <div class="ptt-instruction">Tekan lama atau spasi keyboard untuk berbicara</div>
 
                 <!-- Tombol PTT Bulat -->
-                <button
-                  class="ptt-round-btn"
-                  id="pttButton"
-                  onmousedown="startPTT()"
-                  onmouseup="stopPTT()"
-                  ontouchstart="startPTT()"
-                  ontouchend="stopPTT()"
+                <button class="ptt-round-btn" id="pttButton" onmousedown="startPTT()" onmouseup="stopPTT()" ontouchstart="startPTT()" ontouchend="stopPTT()"
                   title="Tekan atau Spasi untuk Bicara">
                   <i class="bi bi-mic-fill"></i>
                   <span id="pttBtnText">PTT</span>
                 </button>
 
+                <div id="voiceSignal" class="voice-signal">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+
                 <div class="ptt-channel-badge" id="pttActiveChannelBadge"># K3I POLDA BALI</div>
               </div>
+
+              <!-- <div class="ptt-activity-logo">
+                <img src="../assets/images/logo_tik_polri.png" alt="Logo TIK">
+              </div> -->
 
               <div class="ptt-activity-box">
                 <span class="ptt-activity-label">Sedang Berbicara :</span>
@@ -1138,9 +1225,7 @@
     </div>
 
     <!-- Elemen Toast Kustom -->
-    <div
-      id="custom-toast"
-      style="
+    <div id="custom-toast" style="
         display: none;
         position: fixed;
         top: 40px;
@@ -1165,6 +1250,10 @@
       </div>
     </div>
 
+    <audio id="pttBeepAudio" src="/assets/audio/ptt_beep.wav" preload="auto"></audio>
+    <audio id="ringtoneOutgoing" src="assets/audio/panggilan_keluar.mp3" loop preload="auto"></audio>
+    <audio id="ringtoneIncoming" src="assets/audio/panggilan_masuk.mp3" loop preload="auto"></audio>
+
     <!-- Socket.io Client & SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.2/dist/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -1180,6 +1269,7 @@
       let currentViewMode = 'channel'; // 'channel' atau 'private'
       let activeTargetUserId = null;
       let activeTargetUserName = null;
+      let activePrivateCall = null;
 
       let currentActivationMode = 'Push to Talk';
       let isTransmittingState = false; // Status lokal PTT
@@ -1238,6 +1328,99 @@
         handlePeerPTTStatus(data, data.isTransmitting);
       };
 
+      async function showWelcomePopup() {
+        try {
+          const settings = await window.pywebview.api.load_settings_from_json();
+
+          const welcomeMode =
+            settings?.notifications?.welcomeMessage || 'Show once';
+
+          console.log('[WELCOME] Mode:', welcomeMode);
+
+          // Mode Never: jangan tampilkan popup
+          if (welcomeMode === 'Never') {
+            console.log('[WELCOME] Popup dinonaktifkan.');
+            return;
+          }
+
+          // Ambil status popup dari Python
+          const popupStatus =
+            await window.pywebview.api.get_welcome_popup_status();
+
+          console.log('[WELCOME] Status:', popupStatus);
+
+          // Mode Show once: periksa apakah sudah pernah muncul
+          if (welcomeMode === 'Show once' && popupStatus.shown) {
+            console.log('[WELCOME] Popup sudah pernah ditampilkan.');
+            return;
+          }
+
+          // Tandai sebelum popup ditampilkan agar tidak terjadi pemanggilan ganda
+          await window.pywebview.api.mark_welcome_popup_shown();
+
+          const userName = currentUser?.full_name || 'Operator';
+
+          await Swal.fire({
+            title: 'Selamat Datang',
+            html: `
+                <div style="padding: 8px 0;">
+                    <div style="
+                        width: 65px;
+                        height: 65px;
+                        margin: 0 auto 18px;
+                        border-radius: 18px;
+                        background: rgba(37, 99, 235, .15);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: #60a5fa;
+                        font-size: 32px;
+                    ">
+                        <i class="bi bi-broadcast-pin"></i>
+                    </div>
+
+                    <div style="
+                        font-size: 15px;
+                        font-weight: 600;
+                        color: #60a5fa;
+                        margin-bottom: 10px;
+                    ">
+                        ROIP TIK Polda Bali
+                    </div>
+
+                    <p style="margin-bottom: 8px; color: #e2e8f0;">
+                        Selamat bertugas,
+                        <strong>${escapeHtml(userName)}</strong>.
+                    </p>
+
+                    <p style="
+                        font-size: 12px;
+                        line-height: 1.7;
+                        color: #94a3b8;
+                    ">
+                        Sistem komunikasi Radio Over IP siap digunakan.
+                        Pastikan koneksi server dan perangkat audio
+                        dalam kondisi baik sebelum memulai komunikasi.
+                    </p>
+                </div>
+            `,
+            confirmButtonText:
+              '<i class="bi bi-check-circle"></i> Mulai Menggunakan Aplikasi',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showCloseButton: false,
+            background: '#0f172a',
+            color: '#f1f5f9',
+            width: '430px'
+          });
+
+          console.log('[WELCOME] Popup sambutan ditampilkan.');
+
+        } catch (error) {
+          console.error('[WELCOME ERROR]', error);
+        }
+      }
+
       async function loadAppSettings() {
         if (window.pywebview && window.pywebview.api.load_settings_from_json) {
           try {
@@ -1255,6 +1438,7 @@
         }
       }
 
+
       function applyActivationModeUI() {
         const pttSidebarContent = document.querySelector('.ptt-sidebar-content');
         if (!pttSidebarContent) return;
@@ -1266,13 +1450,14 @@
         const pttBtnText = document.getElementById('pttBtnText');
         const activeSpeakerName = document.getElementById('activeSpeakerName');
 
-        if (roundBtn) roundBtn.classList.remove('active');
-        if (pttIndicator) {
-          pttIndicator.innerText = 'SIAP (READY)';
-          pttIndicator.style.color = '#22c55e';
-        }
-        if (activeSpeakerName) {
-          activeSpeakerName.innerText = 'Belum ada transmisi';
+        // Jangan reset indikator jika private call sedang aktif
+        if (!activePrivateCall) {
+          if (roundBtn) roundBtn.classList.remove('active');
+          if (pttIndicator) {
+            pttIndicator.innerText = 'SIAP (READY)';
+            pttIndicator.style.color = '#22c55e';
+          }
+          if (activeSpeakerName) activeSpeakerName.innerText = 'Belum ada transmisi';
         }
 
         if (currentActivationMode === 'Voice Activation') {
@@ -1305,6 +1490,7 @@
         }
       }
 
+
       window.addEventListener('pywebviewready', async function () {
         if (window.pywebview && window.pywebview.api.apply_window_state) {
           window.pywebview.api.apply_window_state();
@@ -1319,11 +1505,33 @@
           }
 
           const sessionRes = await window.pywebview.api.get_session_data();
+
           if (sessionRes.success && sessionRes.user) {
             currentUser = sessionRes.user;
+            // Simpan ID pengguna yang benar
+            if (currentUser.id != null) {
+              localStorage.setItem('user_id', String(currentUser.id));
+            }
+
             setupUserInterface(currentUser);
+
             await loadUserRooms();
-            initSocket(sessionRes.token || 'rahasia_secure_24101981', currentUser.id, serverUrl);
+
+            if (!sessionRes.token) {
+              console.error('[AUTH] Token sesi tidak ditemukan.');
+              window.location.href = 'login.html';
+              return;
+            }
+
+            initSocket(
+              sessionRes.token,
+              currentUser.id,
+              serverUrl
+            );
+
+            // Tampilkan popup sambutan setelah login berhasil
+            await showWelcomePopup();
+
           } else {
             window.location.href = 'login.html';
           }
@@ -1561,26 +1769,225 @@
           handlePeerPTTStatus(data, false);
         });
 
-        // Event Socket untuk Panggilan Suara Berdering (Ringing)
-        socket.on('incoming_voice_call', (data) => {
+        // ==========================================
+        // PRIVATE VOICE CALL EVENTS
+        // ==========================================
+        // PRIVATE CALL PTT STATUS DARI OPERATOR LAWAN
+        socket.on('private_floor_status', (data) => {
+          console.log('[PRIVATE PTT] Status lawan diterima:', data);
+          if (!activePrivateCall || !data) return;
+          if (String(data.callId) !== String(activePrivateCall.callId)) return;
+
+          const isTransmitting = Boolean(data.isTransmitting);
+          const peerName = data.full_name || data.username || activePrivateCall.peerName || 'Operator';
+          const callBar = document.getElementById('privateCallBar');
+          const speaker = document.getElementById('activeSpeakerName');
+          const pttBtn = document.getElementById('pttButton');
+
+          if (isTransmitting) {
+            if (speaker) speaker.textContent = peerName;
+            setVoiceSignal(true);
+            updatePrivatePttIndicator('remote', data.full_name || data.username || 'Operator');
+          } else {
+            if (speaker) speaker.textContent = 'Belum ada transmisi';
+            setVoiceSignal(false);
+            updatePrivatePttIndicator('ready');
+          }
+
+          if (callBar) {
+            const peerStatus = callBar.querySelector('#privateCallPeerStatus');
+            if (peerStatus) {
+              peerStatus.textContent = isTransmitting
+                ? `${peerName} sedang berbicara`
+                : `Terhubung dengan ${activePrivateCall.peerName || 'Operator'}`;
+            }
+          }
+
+          if (pttBtn) {
+            pttBtn.classList.toggle('private-peer-transmitting', isTransmitting);
+            pttBtn.title = isTransmitting
+              ? `${peerName} sedang berbicara`
+              : 'Tekan atau spasi keyboard untuk berbicara';
+          }
+        });
+
+        socket.on('private_call_status', (data) => {
+          if (!activePrivateCall) return;
+          activePrivateCall.callId = data.callId;
+          activePrivateCall.status = data.status;
+          if (data.status === 'calling') {
+            Swal.update({ title: 'Memanggil...', text: 'Menunggu operator tersedia atau online.', icon: 'info' });
+          } else if (data.status === 'ringing') {
+            Swal.update({ title: 'Berdering...', text: 'Operator sedang menerima panggilan Anda.', icon: 'info' });
+          }
+        });
+
+        socket.on('private_call_unavailable', (data) => {
+          stopPrivateRingtone();
+          activePrivateCall = null;
+          Swal.close();
           Swal.fire({
-            title: `Panggilan Masuk dari ${data.caller_name}`,
-            text: `User memanggil Anda untuk private voice call.`,
+            icon: 'warning',
+            title: data.message || 'Panggilan tidak dapat dilakukan',
+            showConfirmButton: false,
+            timer: 3500,
+            background: '#0f172a',
+            color: '#f1f5f9'
+          });
+        });
+
+        socket.on('incoming_voice_call', (data) => {
+          if (activePrivateCall) {
+            socket.emit('reject_voice_call', { callId: data.callId });
+            return;
+          }
+          activePrivateCall = {
+            callId: data.callId,
+            role: 'receiver',
+            peerId: data.caller_id,
+            peerName: data.caller_name,
+            status: 'ringing'
+          };
+          playPrivateRingtone('incoming');
+          Swal.fire({
+            title: `Panggilan dari ${data.caller_name || 'Operator'}`,
+            text: 'Operator ingin melakukan komunikasi privat.',
             icon: 'info',
             showCancelButton: true,
             confirmButtonText: '<i class="bi bi-telephone-fill"></i> Terima',
             cancelButtonText: '<i class="bi bi-telephone-x-fill"></i> Tolak',
-            confirmButtonColor: '#22c55e',
-            cancelButtonColor: '#ef4444',
+            confirmButtonColor: '#16a34a',
+            cancelButtonColor: '#dc2626',
             allowOutsideClick: false,
-          }).then((res) => {
-            if (res.isConfirmed) {
-              socket.emit('accept_voice_call', { caller_id: data.caller_id, receiver_id: currentUser.id });
-              Swal.fire('Terhubung', 'Private voice call aktif.', 'success');
+            allowEscapeKey: false
+          }).then((result) => {
+            if (!socket || !socket.connected) return;
+            if (result.isConfirmed) {
+              socket.emit('accept_voice_call', { callId: data.callId });
+              Swal.fire({
+                title: 'Menghubungkan...',
+                text: 'Menunggu konfirmasi dari server.',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                didOpen: () => Swal.showLoading()
+              });
             } else {
-              socket.emit('reject_voice_call', { caller_id: data.caller_id, receiver_id: currentUser.id });
+              socket.emit('reject_voice_call', { callId: data.callId });
             }
           });
+        });
+
+        socket.on('voice_call_accepted', (data) => {
+          stopPrivateRingtone();
+          if (!activePrivateCall) {
+            activePrivateCall = { callId: data.callId, role: 'participant' };
+          }
+          activePrivateCall.callId = data.callId;
+          activePrivateCall.status = 'active';
+          activePrivateCall.peerId = data.peer_id || activePrivateCall.peerId;
+          activePrivateCall.peerName = data.peer_name || activePrivateCall.peerName || 'Operator';
+          Swal.close();
+          const oldBar = document.getElementById('privateCallBar');
+          if (oldBar) oldBar.remove();
+          const bar = document.createElement('div');
+          bar.id = 'privateCallBar';
+          bar.style.cssText = 'position:fixed;top:75px;right:20px;z-index:9999;background:#102b25;color:#fff;border:1px solid #16a34a;border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:15px;box-shadow:0 8px 25px #0005;max-width:calc(100vw - 40px)';
+          bar.innerHTML = `
+            <div style="display:flex;align-items:center;gap:10px">
+              <i class="bi bi-telephone-fill" style="color:#4ade80;font-size:20px"></i>
+              <div>
+                <div style="font-weight:600">Panggilan Privat Aktif</div>
+                <small id="privateCallPeerStatus" style="color:#bbf7d0">Terhubung dengan ${escapeHtml(activePrivateCall.peerName)}</small>
+              </div>
+            </div>
+            <button id="endPrivateCallBtn" style="background:#dc2626;color:#fff;border:0;border-radius:8px;padding:8px 12px;cursor:pointer;white-space:nowrap">
+              <i class="bi bi-telephone-x-fill"></i> Akhiri
+            </button>
+          `;
+          document.body.appendChild(bar);
+          document.getElementById('endPrivateCallBtn').addEventListener('click', () => {
+            if (socket && socket.connected && activePrivateCall) {
+              socket.emit('end_private_voice_call', { callId: activePrivateCall.callId });
+              document.getElementById('endPrivateCallBtn').disabled = true;
+              document.getElementById('endPrivateCallBtn').textContent = 'Mengakhiri...';
+            }
+          });
+          Swal.fire({
+            icon: 'success',
+            title: 'Panggilan privat terhubung',
+            showConfirmButton: false,
+            timer: 2500
+          });
+        });
+
+        // Private PTT: indikator pada operator yang menekan tombol
+        socket.on('private_floor_granted', (data) => {
+          if (!activePrivateCall || String(data.callId) !== String(activePrivateCall.callId)) return;
+          updatePrivatePttIndicator('local');
+        });
+
+        // Private PTT: tombol dilepas oleh operator yang berbicara
+        socket.on('private_floor_released', (data) => {
+          if (!activePrivateCall || String(data.callId) !== String(activePrivateCall.callId)) return;
+          updatePrivatePttIndicator('ready');
+        });
+
+        socket.on('private_call_rejected', () => {
+          stopPrivateRingtone();
+          Swal.close();
+          Swal.fire({
+            icon: 'warning',
+            title: 'Panggilan ditolak',
+            showConfirmButton: false,
+            timer: 3000
+          });
+        });
+
+        socket.on('private_call_ended', (data) => {
+          stopPrivateRingtone();
+          if (activePrivateCall && data.callId && activePrivateCall.callId &&
+            String(data.callId) !== String(activePrivateCall.callId)) return;
+
+          const reason = data.reason || 'ended';
+          const peerName = data.peer_name || activePrivateCall?.peerName || 'Operator';
+
+          activePrivateCall = null;
+          const callBar = document.getElementById('privateCallBar');
+          if (callBar) callBar.remove();
+          Swal.close();
+
+          const messages = {
+            timeout: `${peerName} tidak menjawab panggilan Anda.`,
+            rejected: `${peerName} menolak panggilan Anda.`,
+            cancelled: 'Panggilan dibatalkan.',
+            disconnected: `Koneksi dengan ${peerName} terputus.`,
+            ended: 'Panggilan telah diakhiri.'
+          };
+          Swal.fire({
+            icon: reason === 'ended' ? 'info' : 'warning',
+            title: messages[reason] || 'Panggilan berakhir.',
+            showConfirmButton: false,
+            timer: 3000
+          });
+        });
+
+      }
+
+      function playPrivateRingtone(type) {
+        stopPrivateRingtone();
+        const audio = document.getElementById(type === 'incoming' ? 'ringtoneIncoming' : 'ringtoneOutgoing');
+        if (!audio) return;
+        audio.currentTime = 0;
+        audio.play().catch(err => console.warn('[RINGTONE] Gagal memutar:', err));
+      }
+      function stopPrivateRingtone() {
+        ['ringtoneOutgoing', 'ringtoneIncoming'].forEach(id => {
+          const audio = document.getElementById(id);
+          if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+          }
         });
       }
 
@@ -1620,6 +2027,32 @@
         }
       }
 
+      function setVoiceSignal(isActive) {
+        const signal = document.getElementById('voiceSignal');
+        if (!signal) return;
+        signal.classList.toggle('active', isActive);
+      }
+
+      function updatePrivatePttIndicator(status, name = '') {
+        const indicator = document.getElementById('pttIndicator');
+        const speaker = document.getElementById('activeSpeakerName');
+        if (!indicator) return;
+
+        if (status === 'local') {
+          indicator.innerText = 'ANDA BERBICARA';
+          indicator.style.color = '#22c55e';
+          if (speaker) speaker.innerText = 'Anda sedang berbicara';
+        } else if (status === 'remote') {
+          indicator.innerText = 'LAWAN BERBICARA';
+          indicator.style.color = '#f59e0b';
+          if (speaker) speaker.innerText = name || 'Operator sedang berbicara';
+        } else {
+          indicator.innerText = 'SIAP (READY)';
+          indicator.style.color = '#22c55e';
+          if (speaker) speaker.innerText = 'Belum ada transmisi';
+        }
+      }
+
       // --- HANDLE PEER PTT STATUS DI ROOM YANG SAMA ---
       let pttBusyTimeout = null;
 
@@ -1651,6 +2084,8 @@
             activeSpeakerName.innerText = username;
           }
 
+          setVoiceSignal(true);
+
           if (userId === myId) {
             // PTT milik sendiri: jangan disable tombol agar bisa dilepas.
             const pttIndicator = document.getElementById('pttIndicator');
@@ -1681,6 +2116,7 @@
         activePttUserId = null;
         activePttUsername = null;
         activePttRoomId = null;
+        setVoiceSignal(false);
 
         if (userId === myId) {
           resetPttUI();
@@ -1805,9 +2241,6 @@
                     <button class="btn-mini-ctrl ${micClass}" id="mic-${roomId}" onclick="toggleMic('${roomId}', '${escapeHtml(roomName)}')">
                         <i class="bi bi-mic"></i>
                     </button>
-                    <button class="btn-mini-ctrl speaker-active" id="speaker-${roomId}" onclick="toggleSpeaker('${roomId}')">
-                        <i class="bi bi-volume-down"></i>
-                    </button>
                 </div>
             </div>
           `;
@@ -1879,7 +2312,7 @@
 
         filteredMembers.forEach((member, index) => {
           const memberId = member.id || member.user_id;
-          const name = member.full_name || member.username || 'User';
+          const name = String(member.full_name || '').trim() || 'Nama tidak tersedia';
 
           const initials = name
             .split(' ')
@@ -2028,29 +2461,48 @@
       }
 
       function triggerPrivateVoiceCall(targetUserId, targetName) {
+        if (activePrivateCall) {
+          Swal.fire('Informasi', 'Masih ada panggilan pribadi yang aktif atau sedang diproses.', 'info');
+          return;
+        }
+        activePrivateCall = {
+          callId: null,
+          role: 'caller',
+          peerId: targetUserId,
+          peerName: targetName,
+          status: 'calling'
+        };
         Swal.fire({
-          title: `Memanggil ${targetName}...`,
-          text: `Panggilan suara pribadi sedang berdering.`,
+          title: `Memanggil ${escapeHtml(targetName)}...`,
+          text: 'Menunggu penerima mengangkat panggilan.',
           icon: 'info',
-          timer: 5000,
-          timerProgressBar: true,
           showCancelButton: true,
           cancelButtonText: 'Batalkan Panggilan',
           cancelButtonColor: '#ef4444',
+          allowOutsideClick: false,
+          allowEscapeKey: false,
           didOpen: () => {
             if (socket && socket.connected) {
+              playPrivateRingtone('outgoing');
               socket.emit('start_private_voice_call', {
                 caller_id: currentUser.id,
                 caller_name: currentUser.full_name,
-                receiver_id: targetUserId,
+                receiver_id: targetUserId
               });
+            } else {
+              activePrivateCall = null;
+              Swal.fire('Gagal', 'Socket server tidak terhubung.', 'error');
             }
-          },
-        }).then((result) => {
-          if (result.dismiss === Swal.DismissReason.cancel) {
-            if (socket && socket.connected) {
-              socket.emit('cancel_voice_call', { caller_id: currentUser.id, receiver_id: targetUserId });
-            }
+          }
+        }).then(result => {
+          if (result.dismiss === Swal.DismissReason.cancel && activePrivateCall) {
+            stopPrivateRingtone();
+            socket.emit('cancel_voice_call', {
+              caller_id: currentUser.id,
+              receiver_id: targetUserId,
+              callId: activePrivateCall.callId
+            });
+            activePrivateCall = null;
             Swal.fire('Panggilan Dibatalkan', '', 'info');
           }
         });
@@ -2106,9 +2558,9 @@
                     </span>
                     <span class="bubble-time">
                         ${new Date().toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
                     </span>
                 </div>
             `;
@@ -2229,19 +2681,6 @@
         }
       }
 
-      function toggleSpeaker(id) {
-        const btn = document.getElementById(`speaker-${id}`);
-        if (btn.classList.contains('speaker-active')) {
-          btn.classList.remove('speaker-active');
-          btn.classList.add('speaker-muted');
-          btn.innerHTML = '<i class="bi bi-volume-mute"></i>';
-        } else {
-          btn.classList.remove('speaker-muted');
-          btn.classList.add('speaker-active');
-          btn.innerHTML = '<i class="bi bi-volume-down"></i>';
-        }
-      }
-
       function toggleGlobalMic() {
         isMicMuted = !isMicMuted;
         const btn = document.getElementById('btnToggleGlobalMic');
@@ -2350,92 +2789,192 @@
         return String(string).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       }
 
+      const pttBeepAudio = document.getElementById('pttBeepAudio');
+
+      console.log('[PTT AUDIO DEBUG]', {
+        src: document.getElementById('pttBeepAudio')?.getAttribute('src'),
+        currentSrc: document.getElementById('pttBeepAudio')?.currentSrc,
+        readyState: document.getElementById('pttBeepAudio')?.readyState,
+        networkState: document.getElementById('pttBeepAudio')?.networkState,
+        errorCode: document.getElementById('pttBeepAudio')?.error?.code,
+        errorMessage: document.getElementById('pttBeepAudio')?.error?.message
+      });
+
+      // Preload audio
+      if (pttBeepAudio) {
+        pttBeepAudio.load();
+      }
+
+      function playLocalPttBeep() {
+        if (currentActivationMode !== 'Push to Talk') return;
+
+        if (!pttBeepAudio) return;
+
+        pttBeepAudio.currentTime = 0;
+
+        const playPromise = pttBeepAudio.play();
+
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.warn('[PTT BEEP] Gagal memainkan WAV:', error);
+          });
+        }
+      }
+
       // --- PTT START & STOP (DIPERBAIKI DENGAN SWEETALERT & STATUS BUSY) ---
+
+
       let pttPressLocked = false;
+      let activePttMode = null;
+
       async function startPTT() {
         if (pttPressLocked) return;
         pttPressLocked = true;
-        if (isMicMuted) {
+        if (isMicMuted || currentActivationMode !== 'Push to Talk') {
           pttPressLocked = false;
           return;
         }
-        if (currentActivationMode !== 'Push to Talk') {
-          pttPressLocked = false;
-          return;
-        }
-
         const pttBtn = document.getElementById('pttButton');
-        if (pttBtn && pttBtn.disabled) {
+        const isPrivate = !!activePrivateCall;
+        if (activePrivateCall && activePrivateCall.status !== 'active') {
+          pttPressLocked = false;
+          console.warn('[PTT] Tunggu sampai panggilan privat terhubung.');
+          return;
+        }
+        if (!isPrivate && pttBtn && pttBtn.disabled) {
           pttPressLocked = false;
           console.warn('[PTT] Channel sedang digunakan.');
           return;
         }
-
+        activePttMode = isPrivate ? 'private' : 'channel';
+        playLocalPttBeep();
         isTransmittingState = true;
         if (pttBtn) pttBtn.classList.add('active');
-
         const pttBtnText = document.getElementById('pttBtnText');
         const pttIndicator = document.getElementById('pttIndicator');
         const activeSpeakerName = document.getElementById('activeSpeakerName');
-
-        if (pttBtnText) pttBtnText.innerText = 'ON AIR';
-        if (pttIndicator) {
-          pttIndicator.innerText = 'TRANSMISI ON AIR';
-          pttIndicator.style.color = '#ef4444';
-        }
-
-        if (currentUser && activeSpeakerName) {
-          activeSpeakerName.innerText = currentUser.full_name;
-        }
-
-        // Kirim request_floor ke server dengan callback response & event handler
-        if (socket && socket.connected) {
-          // Meminta floor melalui socket Python
-          if (window.pywebview && window.pywebview.api) {
-            try {
-              const result = await window.pywebview.api.request_floor(currentRoomId, currentUser ? currentUser.id : null);
-
-              console.log('[PTT] Request floor:', result);
-
-              if (!result || result.success !== true) {
-                isTransmittingState = false;
-                resetPttUI();
-
-                Swal.fire({
-                  icon: 'warning',
-                  title: result?.message || 'Gagal meminta floor',
-                  showConfirmButton: false,
-                  timer: 3000,
-                  background: '#0f172a',
-                  color: '#f1f5f9',
-                });
-              }
-            } catch (error) {
-              console.error('[PTT] Request floor error:', error);
-              isTransmittingState = false;
-              resetPttUI();
-            }
+        if (activePttMode === 'private') {
+          if (pttBtnText) pttBtnText.innerText = 'REQUEST';
+          if (pttIndicator) {
+            pttIndicator.innerText = 'MEMINTA PRIVATE FLOOR';
+            pttIndicator.style.color = '#38bdf8';
           }
+          if (activeSpeakerName) activeSpeakerName.innerText = activePrivateCall.peerName || 'Private Call';
+          try {
+            const result = await window.pywebview.api.request_private_floor();
+            console.log('[PRIVATE PTT] Request floor:', result);
+            if (!result || result.success !== true) {
+              isTransmittingState = false;
+              activePttMode = null;
+              pttPressLocked = false;
+              resetPttUI();
+              console.warn('[PRIVATE PTT]', result?.message || 'Gagal meminta private floor');
+            }
+          } catch (error) {
+            console.error('[PRIVATE PTT] Request error:', error);
+            isTransmittingState = false;
+            activePttMode = null;
+            pttPressLocked = false;
+            resetPttUI();
+          }
+          return;
+        }
+        if (pttBtnText) pttBtnText.innerText = 'REQUEST';
+        if (pttIndicator) {
+          pttIndicator.innerText = 'MEMINTA CHANNEL FLOOR';
+          pttIndicator.style.color = '#38bdf8';
+        }
+        if (currentUser && activeSpeakerName) activeSpeakerName.innerText = currentUser.full_name;
+        try {
+          console.log('[PRIVATE DEBUG] Tombol PTT ditekan');
+          console.log('[PRIVATE DEBUG] activePrivateCall:', activePrivateCall);
+          console.log('[PRIVATE DEBUG] pywebview:', !!window.pywebview);
+          const result = await window.pywebview.api.request_floor(currentRoomId, currentUser ? currentUser.id : null);
+          console.log('[PTT] Request floor:', result);
+          if (!result || result.success !== true) {
+            isTransmittingState = false;
+            activePttMode = null;
+            pttPressLocked = false;
+            resetPttUI();
+            console.warn('[PTT] Request floor gagal:', result?.message);
+          }
+        } catch (error) {
+          console.error('[PTT] Request floor error:', error);
+          isTransmittingState = false;
+          activePttMode = null;
+          pttPressLocked = false;
+          resetPttUI();
         }
       }
 
       async function stopPTT() {
         if (currentActivationMode !== 'Push to Talk') return;
-        if (!isTransmittingState) return;
-
+        if (!isTransmittingState && !activePttMode) return;
+        const mode = activePttMode;
         isTransmittingState = false;
+        activePttMode = null;
         resetPttUI();
-
         try {
-          if (window.pywebview && window.pywebview.api.release_ptt) {
+          if (mode === 'private') {
+            setVoiceSignal(false);
+            await window.pywebview.api.stop_private_ptt();
+            console.log('[PRIVATE PTT] Transmisi dihentikan');
+          } else if (mode === 'channel') {
             await window.pywebview.api.release_ptt(currentRoomId, currentUser ? currentUser.id : 1);
           }
         } catch (error) {
-          console.error('[PTT] Gagal release floor:', error);
+          console.error('[PTT] Gagal melepaskan floor:', error);
         } finally {
           pttPressLocked = false;
         }
       }
+
+      function updatePrivateFloorStatus(granted) {
+        const btn = document.getElementById('pttButton');
+        const btnText = document.getElementById('pttBtnText');
+        const indicator = document.getElementById('pttIndicator');
+        const speaker = document.getElementById('activeSpeakerName');
+
+        if (activePttMode !== 'private') return;
+
+        if (granted) {
+          if (btnText) btnText.innerText = 'ON AIR';
+          if (indicator) {
+            indicator.innerText = 'PRIVATE ON AIR';
+            indicator.style.color = '#ef4444';
+          }
+          if (speaker) speaker.innerText = currentUser?.full_name || 'Saya';
+          if (btn) btn.classList.add('active');
+          setVoiceSignal(true);
+        } else {
+          if (btnText) btnText.innerText = 'REQUEST';
+          if (indicator) {
+            indicator.innerText = 'MEMINTA PRIVATE FLOOR';
+            indicator.style.color = '#38bdf8';
+          }
+          setVoiceSignal(false);
+        }
+      }
+
+      document.getElementById('endPrivateCallBtn').addEventListener('click', () => {
+        if (!socket || !socket.connected || !activePrivateCall) return;
+
+        const button = document.getElementById('endPrivateCallBtn');
+        const callId = activePrivateCall.callId;
+
+        button.disabled = true;
+        button.textContent = 'Mengakhiri...';
+
+        socket.emit('end_private_voice_call', { callId }, (response) => {
+          console.log('[PRIVATE CALL END ACK]', response);
+
+          if (!response?.success) {
+            button.disabled = false;
+            button.textContent = 'Akhiri Panggilan';
+            Swal.fire('Gagal', response?.message || 'Panggilan gagal diakhiri', 'error');
+          }
+        });
+      });
 
       function matchesShortcut(e, shortcutString) {
         if (!shortcutString) return false;
@@ -2456,19 +2995,19 @@
         return ctrlMatch && shiftMatch && altMatch && keyMatch;
       }
 
+
       let isShortcutPressed = false;
 
       window.addEventListener('keydown', (e) => {
-        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+        if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
         if (isMicMuted) return;
 
         if (currentActivationMode === 'Push to Talk') {
           if (userShortcuts.pushToTalk && !userShortcuts.pushToTalk.toLowerCase().includes('mouse')) {
             if (matchesShortcut(e, userShortcuts.pushToTalk)) {
               const pttBtn = document.getElementById('pttButton');
-              if (pttBtn && pttBtn.disabled) {
-                return;
-              }
+              const isPrivate = activePrivateCall && activePrivateCall.status === 'active';
+              if (pttBtn && pttBtn.disabled && !isPrivate) return;
 
               if (!isShortcutPressed) {
                 isShortcutPressed = true;
@@ -2494,8 +3033,6 @@
       });
 
       window.addEventListener('keyup', (e) => {
-        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
-
         if (currentActivationMode === 'Push to Talk') {
           if (userShortcuts.pushToTalk && !userShortcuts.pushToTalk.toLowerCase().includes('mouse')) {
             if (matchesShortcut(e, userShortcuts.pushToTalk)) {
@@ -2536,4 +3073,5 @@
       }
     </script>
   </body>
+
 </html>

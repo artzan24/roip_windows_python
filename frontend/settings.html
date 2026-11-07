@@ -1104,6 +1104,72 @@
               <!-- Input tersembunyi untuk menyimpan data ke backend JSON -->
               <input type="hidden" id="welcomeMsg" value="Show once" onchange="saveSettingsData()" />
             </div>
+
+            <!-- Item 3: Notifikasi Chat Channel -->
+            <div style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding-bottom: 20px;
+                  border-bottom: 1px solid var(--border-color);
+              ">
+              <div style="display: flex; flex-direction: column; gap: 4px; max-width: 75%">
+                <div style="font-size: 13px; font-weight: 650; color: var(--text-normal)">
+                  Chat channel / room
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4">
+                  Tampilkan notifikasi Windows ketika menerima pesan baru di channel.
+                </div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="chatRoomNotif" checked onchange="saveSettingsData()" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <!-- Item 4: Notifikasi Chat Pribadi -->
+            <div style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding-bottom: 20px;
+                  border-bottom: 1px solid var(--border-color);
+              ">
+              <div style="display: flex; flex-direction: column; gap: 4px; max-width: 75%">
+                <div style="font-size: 13px; font-weight: 650; color: var(--text-normal)">
+                  Chat pribadi
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4">
+                  Tampilkan notifikasi Windows ketika menerima pesan pribadi.
+                </div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="privateChatNotif" checked onchange="saveSettingsData()" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <!-- Item 5: Notifikasi PTT Masuk -->
+            <div style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  padding-bottom: 20px;
+                  border-bottom: 1px solid var(--border-color);
+              ">
+              <div style="display: flex; flex-direction: column; gap: 4px; max-width: 75%">
+                <div style="font-size: 13px; font-weight: 650; color: var(--text-normal)">
+                  Transmisi PTT masuk
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4">
+                  Tampilkan notifikasi Windows ketika operator lain mulai berbicara.
+                </div>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="pttIncomingNotif" checked onchange="saveSettingsData()" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -1242,23 +1308,27 @@
         saveSettingsData();
       }
 
+
       function updateSliderLabel(sliderId, textId, unit) {
         const slider = document.getElementById(sliderId);
         const text = document.getElementById(textId);
+
         if (slider && text) {
           text.innerText = slider.value + unit;
 
-          // Kirim perubahan nilai slider ke backend Python secara real-time
-          if (window.pywebview) {
+          // Jangan simpan ke backend ketika sedang memuat settings awal
+          if (!isInitializing && window.pywebview?.api) {
             const micVol = document.getElementById('micVolume').value;
             const speakerVol = document.getElementById('speakerVolume').value;
+
             window.pywebview.api.save_audio_volumes(micVol, speakerVol);
           }
         }
       }
 
+
       let currentActivationMode = 'Push to Talk';
-      async function setActivationMode(modeName) {
+      async function setActivationMode(modeName, saveToBackend = true) {
         const allowedModes = [
           'Voice Activation',
           'Continuous',
@@ -1275,10 +1345,12 @@
             console.error('[SETTINGS] Python API belum tersedia.');
             return;
           }
-          const result = await window.pywebview.api.set_activation_mode(modeName);
-          if (!result?.success) {
-            console.error('[SETTINGS] Gagal menyimpan:', result?.message);
-            return;
+          if (saveToBackend) {
+            const result = await window.pywebview.api.set_activation_mode(modeName);
+            if (!result?.success) {
+              console.error('[SETTINGS] Gagal menyimpan:', result?.message);
+              return;
+            }
           }
           currentActivationMode = modeName;
 
@@ -1295,7 +1367,7 @@
           if (!isInitializing) {
             showSaveIndicator();
           }
-          console.log('[SETTINGS] Mode berhasil disimpan:', result.mode);
+          console.log('[SETTINGS] Mode berhasil diterapkan:', modeName);
         } catch (error) {
           console.error('[SETTINGS] Error:', error);
         }
@@ -1374,17 +1446,30 @@
           notifications: {
             sound: document.getElementById('notifSound').checked,
             native: document.getElementById('nativeNotif').checked,
+
+            chatRoom: document.getElementById('chatRoomNotif').checked,
+            privateChat: document.getElementById('privateChatNotif').checked,
+            pttIncoming: document.getElementById('pttIncomingNotif').checked,
+
             welcomeMessage: document.getElementById('welcomeMsg').value,
           },
         };
 
         if (window.pywebview && window.pywebview.api) {
-          window.pywebview.api.save_settings_to_json(settingsPayload).then((response) => {
-            showSaveIndicator();
-          });
+          window.pywebview.api.save_settings_to_json(settingsPayload)
+            .then((response) => {
+              if (response === true) {
+                console.log('[SETTINGS] Berhasil disimpan');
+                showSaveIndicator();
+              } else {
+                console.error('[SETTINGS] Gagal menyimpan settings.json');
+              }
+            })
+            .catch((error) => {
+              console.error('[SETTINGS] Error:', error);
+            });
         } else {
-          console.log('Simpan ke JSON:', settingsPayload);
-          showSaveIndicator();
+          console.warn('[SETTINGS] PyWebView API belum tersedia');
         }
       }
 
@@ -1403,17 +1488,8 @@
       }
 
       function goBack() {
-        if (typeof socket !== 'undefined' && socket) {
-          socket.disconnect();
-        }
-
-        setTimeout(() => {
-          if (window.pywebview && window.pywebview.api && window.pywebview.api.go_to_index) {
-            window.pywebview.api.go_to_index();
-          } else {
-            window.location.href = 'index.html';
-          }
-        }, 150);
+        // Kembali ke halaman index tanpa memutus koneksi Socket.IO
+        window.location.href = 'index.html';
       }
 
       // Mengatur interaksi buka/tutup custom select saat diklik
@@ -1567,7 +1643,7 @@
               updateSliderLabel('speakerVolume', 'speakerVolText', '%');
             }
             if (data.activationMode) {
-              setActivationMode(data.activationMode);
+              setActivationMode(data.activationMode, false);
             }
             if (data.voiceThreshold) {
               const slider = document.getElementById('voiceThreshold');
@@ -1612,6 +1688,20 @@
                 if (val === 'Always') labelText = 'Selalu tampilkan';
                 if (val === 'Never') labelText = 'Jangan pernah';
                 document.getElementById('label-welcomeMsg').textContent = labelText;
+              }
+              if (data.notifications.chatRoom !== undefined) {
+                document.getElementById('chatRoomNotif').checked =
+                  data.notifications.chatRoom;
+              }
+
+              if (data.notifications.privateChat !== undefined) {
+                document.getElementById('privateChatNotif').checked =
+                  data.notifications.privateChat;
+              }
+
+              if (data.notifications.pttIncoming !== undefined) {
+                document.getElementById('pttIncomingNotif').checked =
+                  data.notifications.pttIncoming;
               }
             }
 

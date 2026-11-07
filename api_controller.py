@@ -12,12 +12,46 @@ import time
 import socketio
 import serial
 import serial.tools.list_ports
+import wave
+import queue
 
 from roip_client import RoIPClientManager
 from database_manager import DatabaseManager
 
-CONFIG_FILE = "config.json"
-SETTINGS_FILE = "settings.json"
+# ==========================================
+# LOKASI DATA APLIKASI
+# ==========================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Folder penyimpanan data khusus pengguna Windows
+USER_DATA_DIR = os.path.join(
+    os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
+    "ROIP TIK Polda Bali"
+)
+
+os.makedirs(USER_DATA_DIR, exist_ok=True)
+
+# Konfigurasi server tetap berada di folder aplikasi untuk sementara
+CONFIG_FILE = os.path.join(USER_DATA_DIR, "config.json")
+
+# Migrasi config.json lama jika file AppData belum tersedia
+OLD_CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
+
+if not os.path.exists(CONFIG_FILE) and os.path.exists(OLD_CONFIG_FILE):
+    import shutil
+    shutil.copy2(OLD_CONFIG_FILE, CONFIG_FILE)
+
+# Settings disimpan di AppData agar aman saat update aplikasi
+SETTINGS_FILE = os.path.join(USER_DATA_DIR, "settings.json")
+
+# Migrasi settings lama hanya saat pertama kali dijalankan
+OLD_SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
+
+if not os.path.exists(SETTINGS_FILE) and os.path.exists(OLD_SETTINGS_FILE):
+    import shutil
+    shutil.copy2(OLD_SETTINGS_FILE, SETTINGS_FILE)
+
+print(f"[SETTINGS] Lokasi penyimpanan: {SETTINGS_FILE}")
 
 class RECT(ctypes.Structure):
     _fields_ = [
@@ -37,6 +71,8 @@ class RoIPLoginAPI:
         self.is_maximized = False
         self.current_user = None   # Menyimpan objek data user dari server (id, username, full_name, role, dll)
         self.auth_token = None     # Menyimpan API_SECRET_TOKEN yang dikembalikan server saat login
+        # Status popup sambutan selama aplikasi berjalan
+        self.welcome_popup_shown = False
 
         self.pyaudio_instance = pyaudio.PyAudio()
         self.is_recording = False
@@ -59,6 +95,20 @@ class RoIPLoginAPI:
         self.ptt_floor_granted = False
         self.ptt_cancel_pending = False
         self.ptt_request_room_id = None
+
+        # State Private Voice Call
+        self.private_call_id = None
+        self.private_call_peer_id = None
+        self.private_call_active = False
+        self.private_floor_requested = False
+        self.private_floor_granted = False
+        self.private_is_transmitting = False
+        self.private_ptt_held = False
+        self.private_recording = False
+        self.private_recording_thread = None
+        self.private_audio_queue = queue.Queue(maxsize=50)
+        self.private_audio_thread = None
+        self.private_audio_playing = False
 
         self.mic_volume = 100
         self.speaker_volume = 100
@@ -135,9 +185,123 @@ class RoIPLoginAPI:
                 except Exception as e:
                     print(f"[ERROR LOG] Gagal mengevaluasi JS user_ptt_broadcast: {e}")
 
+        @self.sio.on('ptt_started')
+        def on_ptt_started(data):
+            if not isinstance(data, dict):
+                return
+
+            event_room = data.get("roomId") or data.get("room_id")
+            event_user = data.get("userId") or data.get("user_id")
+
+            if event_room is not None:
+                if str(event_room) != str(self.current_room_id):
+                    return
+
+            # Jangan bunyikan beep kedua pada pengirim
+            if str(event_user) == str(self.current_user.get("id")):
+                return
+
+            self.play_ptt_wav()
+
+
+        @self.sio.on('ptt_stopped')
+        def on_ptt_stopped(data):
+            print(f"[PTT TONE] Transmisi selesai: {data}")
+            if not isinstance(data, dict):
+                return
+            event_room = data.get("roomId") or data.get("room_id")
+            if event_room is not None:
+                if str(event_room) != str(self.current_room_id):
+                    return
+            self.play_ptt_wav()
+
         @self.sio.event
         def disconnect():
             print("[SOCKET.IO] Terputus dari WebSocket server pusat.")
+
+        @self.sio.on('receive_channel_chat')
+        def on_receive_channel_chat(data):
+            try:
+                if not isinstance(data, dict):
+                    return
+
+                print(f"[CHAT GROUP] Pesan diterima: {data}")
+
+                settings = self.load_settings_from_json()
+                notifications = settings.get("notifications", {})
+
+                # Periksa pengaturan notifikasi channel
+                if not notifications.get("native", True):
+                    return
+
+                if not notifications.get("chatRoom", True):
+                    return
+
+                # Jangan tampilkan notifikasi untuk pesan sendiri
+                current_user_id = str(
+                    (self.current_user or {}).get("id", "")
+                )
+
+                sender_id = str(data.get("userId", ""))
+
+                if current_user_id and sender_id == current_user_id:
+                    return
+
+                username = data.get("username", "Operator")
+                message = data.get("message", "")
+
+                if not message.strip():
+                    return
+
+                self.show_windows_notification(
+                    f"Pesan Channel - {username}",
+                    message
+                )
+
+            except Exception as e:
+                print(f"[CHAT GROUP NOTIFICATION ERROR] {e}")
+
+        @self.sio.on('receive_private_chat')
+        def on_receive_private_chat(data):
+            try:
+                if not isinstance(data, dict):
+                    return
+
+                print(f"[CHAT PRIVATE] Pesan diterima: {data}")
+
+                settings = self.load_settings_from_json()
+                notifications = settings.get("notifications", {})
+
+                # Periksa pengaturan notifikasi private chat
+                if not notifications.get("native", True):
+                    return
+
+                if not notifications.get("privateChat", True):
+                    return
+
+                # Pastikan pesan memang ditujukan kepada user ini
+                current_user_id = str(
+                    (self.current_user or {}).get("id", "")
+                )
+
+                receiver_id = str(data.get("receiverId", ""))
+
+                if not current_user_id or receiver_id != current_user_id:
+                    return
+
+                sender_name = data.get("senderName", "Operator")
+                message = data.get("message", "")
+
+                if not message.strip():
+                    return
+
+                self.show_windows_notification(
+                    f"Pesan Pribadi - {sender_name}",
+                    message
+                )
+
+            except Exception as e:
+                print(f"[CHAT PRIVATE NOTIFICATION ERROR] {e}")
 
         @self.sio.on('floor_granted')
         def on_floor_granted(data):
@@ -240,16 +404,225 @@ class RoIPLoginAPI:
         @self.sio.on('audio_stream')
         def on_audio_stream(data):
             try:
-                # Jika server mengirim buffer biner mentah atau JSON object
-                if isinstance(data, bytes):
-                    self.handle_incoming_channel_audio(self.current_room_id, data)
-                elif isinstance(data, dict):
-                    channel_id = data.get('roomId') or self.current_room_id
-                    audio_bytes = data.get('audioData')
-                    if audio_bytes:
-                        self.handle_incoming_channel_audio(channel_id, audio_bytes)
+                if not isinstance(data, dict):
+                    print("[AUDIO BLOCKED] Audio tanpa identitas room ditolak.")
+                    return
+                channel_id = data.get('roomId')
+                audio_bytes = data.get('audioData')
+                if channel_id is None or str(channel_id) != str(self.current_room_id):
+                    return
+                if not isinstance(audio_bytes, bytes):
+                    return
+                if self.private_call_active:
+                    return
+                self.handle_incoming_channel_audio(channel_id, audio_bytes)
             except Exception as e:
-                print(f"[SOCKET AUDIO ERROR] Gagal memproses audio masuk: {e}")
+                print(f"[SOCKET AUDIO ERROR] {e}")
+
+        # ==========================================
+        # PRIVATE VOICE CALL EVENTS
+        # ==========================================
+        @self.sio.on('voice_call_accepted')
+        def on_voice_call_accepted(data):
+            print(f"[PRIVATE DEBUG] EVENT voice_call_accepted diterima: {data}")
+            if not isinstance(data, dict):
+                return
+            call_id = data.get('callId') or data.get('call_id')
+            if call_id:
+                self.private_call_id = str(call_id)
+            current_user_id = str((self.current_user or {}).get('id', ''))
+            caller_id = str(data.get('callerId') or data.get('caller_id') or '')
+            receiver_id = str(data.get('receiverId') or data.get('receiver_id') or '')
+            if caller_id and receiver_id:
+                self.private_call_peer_id = receiver_id if current_user_id == caller_id else caller_id
+            self.private_call_active = True
+
+            # Hentikan channel recording tanpa menahan handler Socket.IO.
+            if self.is_recording:
+                self.is_recording = False
+                print("[PRIVATE AUDIO] Menghentikan background channel recording.")
+
+            print(f"[PRIVATE DEBUG] call_id={self.private_call_id}")
+            print(f"[PRIVATE DEBUG] user_id={current_user_id}")
+            print(f"[PRIVATE DEBUG] private_call_active={self.private_call_active}")
+            self._start_private_audio_playback()
+
+        @self.sio.on('private_call_ended')
+        def on_private_call_ended(data):
+            print(f"[PRIVATE CALL] Panggilan berakhir: {data}")
+
+            self.private_call_active = False
+            self.private_audio_playing = False
+            self.private_floor_requested = False
+            self.private_floor_granted = False
+            self.private_is_transmitting = False
+            self.private_ptt_held = False
+            self.private_recording = False
+            self.private_call_id = None
+            self.private_call_peer_id = None
+
+            with self.private_audio_queue.mutex:
+                self.private_audio_queue.queue.clear()
+
+            print("[PRIVATE CALL] Status private call dibersihkan.")
+            self.start_background_recording_if_needed()
+
+        @self.sio.on('private_call_rejected')
+        def on_private_call_rejected(data):
+            print(f"[PRIVATE CALL] Panggilan ditolak: {data}")
+
+            self.private_call_active = False
+            self.private_audio_playing = False
+            self.private_floor_requested = False
+            self.private_floor_granted = False
+            self.private_is_transmitting = False
+            self.private_ptt_held = False
+            self.private_recording = False
+            self.private_call_id = None
+            self.private_call_peer_id = None
+
+            with self.private_audio_queue.mutex:
+                self.private_audio_queue.queue.clear()
+
+            self.start_background_recording_if_needed()
+
+        @self.sio.on('private_floor_granted')
+        def on_private_floor_granted(data):
+            print(f"[PRIVATE FLOOR] Floor diberikan: {data}")
+            if isinstance(data, dict):
+                call_id = data.get('callId') or data.get('call_id')
+                if call_id and self.private_call_id and str(call_id) != str(self.private_call_id):
+                    return
+            if not self.private_call_active:
+                return
+            self.private_floor_requested = False
+            self.private_floor_granted = True
+            if not self.private_ptt_held:
+                print("[PRIVATE FLOOR] PTT sudah dilepas sebelum floor diberikan.")
+                self.sio.emit('release_private_floor', {"callId": self.private_call_id})
+                self.private_floor_granted = False
+                return
+            print("[PRIVATE FLOOR] Siap transmisi private call")
+            self.start_private_ptt()
+            if self.window:
+                try:
+                    self.window.evaluate_js("if(typeof updatePrivateFloorStatus === 'function') updatePrivateFloorStatus(true)")
+                except Exception as e:
+                    print(f"[PRIVATE FLOOR] Gagal update UI: {e}")
+
+        @self.sio.on('private_floor_released')
+        def on_private_floor_released(data):
+            print(f"[PRIVATE FLOOR] Floor dilepaskan: {data}")
+            self.private_floor_requested = False
+            self.private_floor_granted = False
+            self.private_is_transmitting = False
+            self.private_recording = False
+            if self.window:
+                try:
+                    self.window.evaluate_js("if(typeof updatePrivateFloorStatus === 'function') updatePrivateFloorStatus(false)")
+                except Exception as e:
+                    print(f"[PRIVATE FLOOR] Gagal update UI: {e}")
+
+        @self.sio.on('private_audio_stream')
+        def on_private_audio_stream(data):
+            try:
+                if not self.private_call_active:
+                    return
+                audio_bytes = data
+                if isinstance(data, dict):
+                    audio_bytes = data.get('audioData') or data.get('audio')
+                if not isinstance(audio_bytes, bytes):
+                    return
+                try:
+                    self.private_audio_queue.put_nowait(audio_bytes)
+                except queue.Full:
+                    try:
+                        self.private_audio_queue.get_nowait()
+                        self.private_audio_queue.put_nowait(audio_bytes)
+                    except queue.Empty:
+                        pass
+            except Exception as e:
+                print(f"[PRIVATE AUDIO RECEIVE ERROR] {e}")
+
+    def play_ptt_wav(self):
+        try:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+            wav_path = os.path.join(
+                base_path,
+                "assets",
+                "audio",
+                "ptt_beep.wav"
+            )
+            if not os.path.exists(wav_path):
+                print(f"[PTT WAV] File tidak ditemukan: {wav_path}")
+                return
+            settings = self.load_settings_from_json()
+            output_device = settings.get(
+                "outputDevice",
+                "System default"
+            )
+            output_index = self._get_device_index(
+                output_device,
+                is_output=True
+            )
+            def playback():
+                stream = None
+
+                try:
+                    with wave.open(wav_path, "rb") as wav:
+                        channels = wav.getnchannels()
+                        rate = wav.getframerate()
+                        sample_width = wav.getsampwidth()
+                        frames = wav.readframes(wav.getnframes())
+
+                    stream = self.pyaudio_instance.open(
+                        format=self.pyaudio_instance.get_format_from_width(
+                            sample_width
+                        ),
+                        channels=channels,
+                        rate=rate,
+                        output=True,
+                        output_device_index=output_index
+                    )
+
+                    volume = max(
+                        0,
+                        min(100, int(self.speaker_volume))
+                    ) / 100.0
+
+                    audio = np.frombuffer(
+                        frames,
+                        dtype=np.int16
+                    ).astype(np.float32)
+
+                    audio *= volume
+
+                    audio = np.clip(
+                        audio,
+                        -32768,
+                        32767
+                    ).astype(np.int16)
+
+                    stream.write(audio.tobytes())
+
+                except Exception as e:
+                    print(f"[PTT WAV PLAYBACK ERROR] {e}")
+
+                finally:
+                    if stream:
+                        try:
+                            stream.stop_stream()
+                            stream.close()
+                        except Exception:
+                            pass
+
+            threading.Thread(
+                target=playback,
+                daemon=True
+            ).start()
+
+        except Exception as e:
+            print(f"[PTT WAV ERROR] {e}")
 
     def connect_socket(self):
         if not self.sio.connected:
@@ -263,6 +636,46 @@ class RoIPLoginAPI:
 
     def set_window(self, window):
         self.window = window
+
+    def get_welcome_popup_status(self):
+        return {
+            "shown": self.welcome_popup_shown
+        }
+
+    def mark_welcome_popup_shown(self):
+        self.welcome_popup_shown = True
+        print("[WELCOME] Status popup ditandai sudah ditampilkan.")
+        return {"success": True}
+
+    def show_windows_notification(self, title, message):
+        """Menampilkan notifikasi native Windows sesuai pengaturan pengguna."""
+        try:
+            settings = self.load_settings_from_json()
+            notifications = settings.get("notifications", {})
+
+            # Sakelar utama notifikasi Windows
+            if not notifications.get("native", True):
+                return
+
+            from winotify import Notification, audio
+
+            toast = Notification(
+                app_id="ROIP TIK Polda Bali",
+                title=str(title),
+                msg=str(message),
+                duration="short"
+            )
+
+            # Pengaturan suara notifikasi
+            if notifications.get("sound", False):
+                toast.set_audio(audio.Default, loop=False)
+            else:
+                toast.set_audio(audio.Silent, loop=False)
+
+            toast.show()
+
+        except Exception as e:
+            print(f"[NOTIFICATION ERROR] {e}")
 
     def check_server_status(self):
         try:
@@ -434,8 +847,12 @@ class RoIPLoginAPI:
                 for key in ("hardwareInterface", "shortcuts", "notifications"):
                     if isinstance(new_settings.get(key), dict):
                         existing_data[key].update(new_settings[key])
-                settings_path = os.path.abspath(SETTINGS_FILE)
+                # Lokasi settings.json di AppData
+                settings_path = SETTINGS_FILE
                 settings_dir = os.path.dirname(settings_path)
+
+                # Pastikan folder tersedia
+                os.makedirs(settings_dir, exist_ok=True)
 
                 # Buat file sementara dengan nama unik
                 fd, temp_file = tempfile.mkstemp(
@@ -500,6 +917,10 @@ class RoIPLoginAPI:
             "notifications": {
                 "sound": False,
                 "native": True,
+                "chatRoom": True,
+                "privateChat": True,
+                "pttIncoming": True,
+
                 "welcomeMessage": "Show once"
             }
         }
@@ -984,23 +1405,29 @@ class RoIPLoginAPI:
     def go_to_index(self):
         if self.window:
             base_path = os.path.dirname(os.path.abspath(__file__))
-            index_path = os.path.join(base_path, 'frontend', 'index.html')
-            file_url = f"file:///{index_path.replace(os.sep, '/')}"
-            self.window.load_url(file_url)
+            index_path = os.path.join(
+                base_path, 'frontend', 'index.html'
+            )
+
+            self.window.load_url(index_path)
 
     def go_to_login(self):
         try:
             self.is_recording = False
+
             if self.sio.connected:
                 self.sio.disconnect()
             self.current_user = None
             self.auth_token = None
+
             if self.window:
                 base_path = os.path.dirname(os.path.abspath(__file__))
-                login_path = os.path.join(base_path, 'frontend', 'login.html')
-                file_url = f"file:///{login_path.replace(os.sep, '/')}"
-                self.window.load_url(file_url)
+                login_path = os.path.join(
+                    base_path, 'frontend', 'login.html'
+                )
+                self.window.load_url(login_path)
             return {"success": True}
+
         except Exception as e:
             return {"success": False, "message": str(e)}
 
@@ -1131,6 +1558,10 @@ class RoIPLoginAPI:
                 or self.current_user.get('fullname')
                 or self.current_user.get('username')
                 or 'Unknown User'
+            ),
+            'activationMode': self.load_settings_from_json().get(
+                "activationMode",
+                "Push to Talk"
             )
         }
 
@@ -1200,10 +1631,13 @@ class RoIPLoginAPI:
 
     def start_background_recording_if_needed(self):
         try:
+            if self.private_call_active:
+                print("[AUDIO] Background channel tidak dijalankan karena private call aktif.")
+                return
+
             settings = self.load_settings_from_json()
             activation_mode = settings.get("activationMode", "Push to Talk")
-            
-            # Jangan jalankan background recording jika mode adalah Push to Talk!
+
             if activation_mode == "Push to Talk":
                 return
 
@@ -1212,8 +1646,10 @@ class RoIPLoginAPI:
                     if not getattr(self, 'is_recording', False):
                         self.is_recording = True
                         self.ptt_start_time = time.time()
-                        self.recording_thread = threading.Thread(target=self._record_and_stream_loop)
-                        self.recording_thread.daemon = True
+                        self.recording_thread = threading.Thread(
+                            target=self._record_and_stream_loop,
+                            daemon=True
+                        )
                         self.recording_thread.start()
         except Exception as e:
             print(f"[AUDIO ERROR] Gagal memulai background recording: {e}")
@@ -1300,6 +1736,10 @@ class RoIPLoginAPI:
                 if not data:
                     continue
 
+                # Jangan proses atau kirim audio channel selama private call aktif.
+                if self.private_call_active:
+                    continue
+
                 settings = self.load_settings_from_json()
                 mode = settings.get("activationMode", "Push to Talk")
                 threshold = float(settings.get("voiceThreshold", -40))
@@ -1339,7 +1779,8 @@ class RoIPLoginAPI:
                                         or self.current_user.get('fullname')
                                         or self.current_user.get('username')
                                         or 'Unknown User'
-                                    )
+                                    ),
+                                    'activationMode': 'Voice Activation'
                                 })
                                 print(f"[VAD] Meminta floor room={room_id}")
                     else:
@@ -1373,7 +1814,10 @@ class RoIPLoginAPI:
                 mic_scale = float(self.mic_volume) / 100.0
                 audio_chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32)
                 processed_data = np.clip(audio_chunk * mic_scale, -32768, 32767).astype(np.int16).tobytes()
-                self.sio.emit('audio_stream', processed_data)
+                self.sio.emit('audio_stream', {
+                    'roomId': str(self.current_room_id),
+                    'audioData': processed_data
+                })
 
         except Exception as e:
             print(f"[ERROR PyAudio Stream] {e}")
@@ -1458,3 +1902,141 @@ class RoIPLoginAPI:
             return {"success": True}
         except Exception as e:
             return {"success": False, "message": str(e)}
+
+    def _start_private_audio_playback(self):
+        if self.private_audio_thread and self.private_audio_thread.is_alive():
+            return
+        self.private_audio_playing = True
+        self.private_audio_thread = threading.Thread(
+            target=self._private_audio_playback_loop,
+            daemon=True
+        )
+        self.private_audio_thread.start()
+
+    def _private_audio_playback_loop(self):
+        stream_out = None
+        try:
+            settings = self.load_settings_from_json()
+            output_device_name = settings.get("outputDevice", "System default")
+            output_index = self._get_device_index(output_device_name, is_output=True)
+            stream_out = self.pyaudio_instance.open(
+                format=self.FORMAT,
+                channels=self.CHANNELS,
+                rate=self.RATE,
+                output=True,
+                output_device_index=output_index,
+                frames_per_buffer=self.CHUNK
+            )
+            print("[PRIVATE AUDIO] Playback stream aktif")
+            while self.private_audio_playing and self.private_call_active:
+                try:
+                    audio_data = self.private_audio_queue.get(timeout=0.2)
+                except queue.Empty:
+                    continue
+                if not isinstance(audio_data, bytes):
+                    continue
+                processed_audio = self.process_incoming_audio_stream(audio_data)
+                if processed_audio:
+                    stream_out.write(processed_audio)
+        except Exception as e:
+            print(f"[PRIVATE AUDIO PLAYBACK ERROR] {e}")
+        finally:
+            if stream_out:
+                try:
+                    stream_out.stop_stream()
+                    stream_out.close()
+                except Exception:
+                    pass
+            self.private_audio_playing = False
+            print("[PRIVATE AUDIO] Playback stream ditutup")
+
+    def request_private_floor(self):
+        print(f"[PRIVATE DEBUG] request_private_floor dipanggil")
+        print(f"[PRIVATE DEBUG] socket_connected={self.sio.connected}")
+        print(f"[PRIVATE DEBUG] call_active={self.private_call_active}")
+        print(f"[PRIVATE DEBUG] call_id={self.private_call_id}")
+        if not self.sio.connected:
+            return {"success": False, "message": "Socket server tidak terhubung"}
+        if not self.private_call_active or not self.private_call_id:
+            return {"success": False, "message": "Private call belum aktif"}
+        if self.private_floor_requested or self.private_floor_granted:
+            return {"success": False, "message": "Private floor sedang diproses atau digunakan"}
+        if self.ptt_floor_requested or self.ptt_floor_granted:
+            return {"success": False, "message": "Sedang menggunakan PTT channel"}
+        self.private_ptt_held = True
+        self.private_floor_requested = True
+        self.sio.emit('request_private_floor', {
+            "callId": self.private_call_id,
+            "userId": str((self.current_user or {}).get("id", ""))
+        })
+        print(f"[PRIVATE FLOOR] Meminta floor untuk call {self.private_call_id}")
+        return {"success": True}
+
+    def start_private_ptt(self):
+        if not self.private_call_active or not self.private_floor_granted:
+            return {"success": False, "message": "Private floor belum diberikan"}
+        if self.private_is_transmitting:
+            return {"success": True, "message": "Private PTT sudah aktif"}
+        self.private_is_transmitting = True
+        self.private_recording = True
+        self.private_recording_thread = threading.Thread(target=self._private_record_and_stream_loop, daemon=True)
+        self.private_recording_thread.start()
+        return {"success": True}
+
+    def stop_private_ptt(self):
+        self.private_ptt_held = False
+        self.private_recording = False
+        self.private_is_transmitting = False
+
+        if self.sio.connected and self.private_call_id:
+            self.sio.emit('release_private_floor', {
+                "callId": self.private_call_id
+            })
+
+        self.private_floor_requested = False
+        self.private_floor_granted = False
+
+        return {"success": True}
+
+    def _private_record_and_stream_loop(self):
+        stream = None
+        try:
+            settings = self.load_settings_from_json()
+            input_device_name = settings.get("inputDevice", "System default")
+            input_index = self._get_device_index(input_device_name, is_output=False)
+            stream = self.pyaudio_instance.open(
+                format=self.FORMAT,
+                channels=self.CHANNELS,
+                rate=self.RATE,
+                input=True,
+                input_device_index=input_index,
+                frames_per_buffer=self.CHUNK
+            )
+            while self.private_recording and self.private_call_active and self.private_floor_granted:
+                try:
+                    data = stream.read(self.CHUNK, exception_on_overflow=False)
+                except Exception as e:
+                    print(f"[PRIVATE MIC READ ERROR] {e}")
+                    continue
+                if not data or not self.sio.connected:
+                    continue
+                if self.is_mic_muted:
+                    continue
+                mic_scale = float(self.mic_volume) / 100.0
+                audio_chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32)
+                processed_data = np.clip(audio_chunk * mic_scale, -32768, 32767).astype(np.int16).tobytes()
+                self.sio.emit('private_audio_stream', {
+                    "callId": self.private_call_id,
+                    "audioData": processed_data
+                })
+        except Exception as e:
+            print(f"[PRIVATE AUDIO TRANSMIT ERROR] {e}")
+        finally:
+            if stream:
+                try:
+                    stream.stop_stream()
+                    stream.close()
+                except Exception:
+                    pass
+            self.private_recording = False
+            self.private_is_transmitting = False
